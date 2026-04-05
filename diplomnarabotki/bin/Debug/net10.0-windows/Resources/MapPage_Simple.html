@@ -1,0 +1,1543 @@
+﻿<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8" />
+    <title>Журнал путешественника</title>
+
+    <!-- Leaflet -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+    <!-- jQuery UI -->
+    <link rel="stylesheet" href="https://code.jquery.com/ui/1.13.2/themes/base/jquery-ui.css">
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script src="https://code.jquery.com/ui/1.13.2/jquery-ui.min.js"></script>
+
+    <style>
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: 'Segoe UI', Arial, sans-serif;
+            background: #1a1a2e;
+        }
+
+        #map {
+            position: absolute;
+            top: 0;
+            bottom: 0;
+            width: 100%;
+            height: 100%;
+        }
+
+        .controls {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            z-index: 1000;
+            background: rgba(30,30,40,0.95);
+            backdrop-filter: blur(10px);
+            border-radius: 12px;
+            min-width: 260px;
+            max-width: 300px;
+            border: 1px solid rgba(255,255,255,0.1);
+            color: #eee;
+        }
+
+        .menu-header {
+            padding: 12px 15px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border-radius: 12px 12px 0 0;
+            cursor: pointer;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-weight: bold;
+        }
+
+            .menu-header .menu-icon {
+                font-size: 20px;
+                transition: transform 0.3s;
+            }
+
+            .menu-header.collapsed .menu-icon {
+                transform: rotate(180deg);
+            }
+
+        .menu-content {
+            padding: 10px;
+            max-height: 80vh;
+            overflow-y: auto;
+            display: block;
+        }
+
+            .menu-content.collapsed {
+                display: none;
+            }
+
+        .controls button {
+            margin: 5px;
+            padding: 8px 12px;
+            cursor: pointer;
+            background: #4a5568;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            font-size: 13px;
+            width: calc(100% - 10px);
+        }
+
+            .controls button:hover {
+                background: #5a6578;
+            }
+
+            .controls button.danger {
+                background: #e53e3e;
+            }
+
+            .controls button.primary {
+                background: #667eea;
+            }
+
+            .controls button.warning {
+                background: #ed8936;
+            }
+
+            .controls button.success {
+                background: #48bb78;
+            }
+
+        .collapsible-section {
+            margin: 8px 0;
+            border: 1px solid #4a5568;
+            border-radius: 8px;
+            overflow: hidden;
+        }
+
+        .section-header {
+            background: #2d3748;
+            padding: 8px 12px;
+            cursor: pointer;
+            font-weight: bold;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+            .section-header .icon {
+                font-size: 14px;
+                transition: transform 0.2s;
+            }
+
+            .section-header.collapsed .icon {
+                transform: rotate(-90deg);
+            }
+
+        .section-content {
+            padding: 10px;
+            display: block;
+            background: #1a202c;
+        }
+
+            .section-content.collapsed {
+                display: none;
+            }
+
+        .info-panel {
+            position: absolute;
+            bottom: 10px;
+            left: 10px;
+            z-index: 1000;
+            background: rgba(0,0,0,0.8);
+            backdrop-filter: blur(8px);
+            padding: 10px;
+            border-radius: 10px;
+            max-width: 280px;
+            font-size: 12px;
+            color: #e2e8f0;
+            border: 1px solid rgba(255,255,255,0.1);
+        }
+
+        .distance-info {
+            position: absolute;
+            bottom: 10px;
+            right: 10px;
+            z-index: 1000;
+            background: rgba(0,0,0,0.8);
+            backdrop-filter: blur(8px);
+            padding: 10px;
+            border-radius: 10px;
+            font-size: 13px;
+            font-weight: bold;
+            color: #667eea;
+            text-align: center;
+            min-width: 180px;
+            border: 1px solid rgba(255,255,255,0.1);
+        }
+
+        .cache-info {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            z-index: 1000;
+            background: rgba(0,0,0,0.6);
+            backdrop-filter: blur(4px);
+            color: #a0aec0;
+            padding: 4px 10px;
+            border-radius: 20px;
+            font-size: 10px;
+        }
+
+        .custom-marker {
+            background: transparent !important;
+            border: none !important;
+        }
+
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 2000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0,0,0,0.7);
+            backdrop-filter: blur(5px);
+        }
+
+        .modal-content {
+            position: absolute;
+            background: linear-gradient(135deg, #1a202c 0%, #2d3748 100%);
+            padding: 0;
+            border-radius: 16px;
+            width: 500px;
+            max-width: 90vw;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.4);
+            border: 1px solid rgba(255,255,255,0.1);
+        }
+
+        .modal-header {
+            padding: 15px 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border-radius: 16px 16px 0 0;
+            cursor: move;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+            .modal-header h3 {
+                margin: 0;
+                font-size: 18px;
+            }
+
+        .modal-body {
+            padding: 20px;
+            max-height: 65vh;
+            overflow-y: auto;
+            color: #e2e8f0;
+        }
+
+        .modal-footer {
+            padding: 15px 20px;
+            border-top: 1px solid #4a5568;
+            text-align: center;
+        }
+
+            .modal-footer button {
+                padding: 8px 20px;
+                margin: 5px;
+                cursor: pointer;
+                border: none;
+                border-radius: 8px;
+                font-size: 14px;
+            }
+
+                .modal-footer button.save {
+                    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                    color: white;
+                }
+
+                .modal-footer button.cancel {
+                    background: #4a5568;
+                    color: white;
+                }
+
+        .close {
+            font-size: 28px;
+            font-weight: bold;
+            cursor: pointer;
+            color: white;
+            opacity: 0.8;
+        }
+
+            .close:hover {
+                opacity: 1;
+            }
+
+        .form-group {
+            margin-bottom: 15px;
+        }
+
+            .form-group label {
+                display: block;
+                margin-bottom: 5px;
+                font-weight: bold;
+                color: #cbd5e0;
+            }
+
+            .form-group input, .form-group select, .form-group textarea {
+                width: 100%;
+                padding: 8px 10px;
+                border: 1px solid #4a5568;
+                border-radius: 8px;
+                font-size: 14px;
+                background: #1a202c;
+                color: #e2e8f0;
+            }
+
+            .form-group textarea {
+                resize: vertical;
+                min-height: 60px;
+                font-family: inherit;
+            }
+
+        .status-buttons {
+            display: flex;
+            gap: 10px;
+            margin-top: 5px;
+        }
+
+        .status-btn {
+            flex: 1;
+            padding: 8px;
+            border: 2px solid #4a5568;
+            border-radius: 8px;
+            background: #1a202c;
+            cursor: pointer;
+            text-align: center;
+            font-size: 12px;
+        }
+
+            .status-btn.selected {
+                border-color: #667eea;
+                background: rgba(102, 126, 234, 0.2);
+            }
+
+        .photo-preview {
+            margin-top: 10px;
+            text-align: center;
+        }
+
+            .photo-preview img {
+                max-width: 100%;
+                max-height: 150px;
+                border-radius: 8px;
+            }
+
+        .icon-option {
+            display: inline-block;
+            margin: 5px;
+            padding: 8px;
+            cursor: pointer;
+            border: 2px solid transparent;
+            border-radius: 10px;
+            text-align: center;
+            background: #1a202c;
+        }
+
+            .icon-option.selected {
+                border-color: #667eea;
+                background: rgba(102, 126, 234, 0.2);
+            }
+
+            .icon-option span {
+                font-size: 28px;
+                display: block;
+            }
+
+            .icon-option small {
+                font-size: 9px;
+                color: #a0aec0;
+            }
+
+        .icon-grid {
+            display: grid;
+            grid-template-columns: repeat(5, 1fr);
+            gap: 5px;
+            margin-top: 10px;
+        }
+
+        .color-picker-container {
+            margin-top: 10px;
+        }
+
+        .gradient-palette {
+            width: 100%;
+            height: 120px;
+            border-radius: 8px;
+            cursor: crosshair;
+            margin-bottom: 8px;
+            border: 1px solid #4a5568;
+            background: #2d3748;
+        }
+
+        .hue-slider {
+            width: 100%;
+            height: 12px;
+            border-radius: 10px;
+            margin: 8px 0;
+            cursor: pointer;
+        }
+
+        .color-info {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-top: 8px;
+            padding: 8px;
+            background: #1a202c;
+            border-radius: 8px;
+        }
+
+        .current-color {
+            width: 35px;
+            height: 35px;
+            border-radius: 8px;
+            border: 2px solid #4a5568;
+        }
+
+        .color-info input {
+            flex: 1;
+        }
+
+        .points-list-modal {
+            max-width: 600px;
+            width: 600px;
+        }
+
+        .points-list {
+            max-height: 400px;
+            overflow-y: auto;
+        }
+
+        .point-list-item {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 10px;
+            margin: 5px 0;
+            background: #1a202c;
+            border-radius: 8px;
+            border: 1px solid #4a5568;
+        }
+
+            .point-list-item:hover {
+                background: #2d3748;
+            }
+
+        .point-list-info {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            flex: 1;
+        }
+
+        .point-list-icon {
+            font-size: 24px;
+        }
+
+        .point-list-title {
+            font-weight: bold;
+        }
+
+        .point-list-status {
+            font-size: 11px;
+            color: #a0aec0;
+        }
+
+        .point-list-actions button {
+            margin: 0 3px;
+            padding: 5px 10px;
+            font-size: 11px;
+            width: auto;
+        }
+
+        .ui-datepicker {
+            background: #2d3748;
+            border: 1px solid #4a5568;
+            color: #e2e8f0;
+        }
+
+            .ui-datepicker .ui-datepicker-header {
+                background: #1a202c;
+                color: #e2e8f0;
+            }
+
+            .ui-datepicker .ui-state-default {
+                background: #2d3748;
+                color: #e2e8f0;
+                border: none;
+            }
+
+            .ui-datepicker .ui-state-active {
+                background: #667eea;
+            }
+
+            .ui-datepicker .ui-state-hover {
+                background: #4a5568;
+            }
+
+        input[type="file"] {
+            padding: 5px;
+            font-size: 12px;
+        }
+    </style>
+</head>
+<body>
+    <div id="map"></div>
+    <div class="cache-info" id="cacheInfo">📓 Журнал путешественника</div>
+
+    <div class="controls">
+        <div class="menu-header" onclick="toggleMenu()">
+            <span>📔 Журнал путешественника</span>
+            <span class="menu-icon">▼</span>
+        </div>
+        <div class="menu-content" id="menuContent">
+            <button onclick="addMarkerAtCurrentPosition()">📍 Добавить место</button>
+            <button onclick="showPointsList()" class="success">📋 Список всех мест</button>
+            <button onclick="clearAllMarkers()" class="danger">🗑️ Очистить все места</button>
+
+            <div class="collapsible-section">
+                <div class="section-header" onclick="toggleSection(this)">
+                    <span>🧵 Связи между местами</span>
+                    <span class="icon">▼</span>
+                </div>
+                <div class="section-content">
+                    <button onclick="showConnectionSelector()" class="primary">➕ Добавить связь</button>
+                    <button onclick="clearAllStrings()" class="danger">🗑️ Удалить все связи</button>
+                    <small style="display: block; margin-top: 8px; color: #a0aec0;">Соединяйте места изогнутыми линиями</small>
+                </div>
+            </div>
+
+            <div class="collapsible-section">
+                <div class="section-header" onclick="toggleSection(this)">
+                    <span>⚙️ Настройки отображения</span>
+                    <span class="icon">▼</span>
+                </div>
+                <div class="section-content">
+                    <label style="display: flex; align-items: center;">
+                        <input type="checkbox" id="showLabels" checked onchange="toggleAllLabels()" />
+                        <span style="margin-left: 8px;">Показывать названия мест</span>
+                    </label>
+                    <label style="margin-top: 10px;">Размер названий:</label>
+                    <input type="range" id="globalLabelFontSize" min="8" max="20" value="11" step="1" onchange="updateGlobalLabelSettings()" oninput="updateGlobalLabelSettings()" />
+                    <span id="globalFontSizeValue" style="margin-left: 8px;">11px</span>
+
+                    <label style="margin-top: 10px;">Цвет названий:</label>
+                    <div class="color-picker-container">
+                        <div class="gradient-palette" id="labelGradientPalette"></div>
+                        <div class="hue-slider" id="labelHueSlider"></div>
+                        <div class="color-info">
+                            <div class="current-color" id="labelCurrentColor"></div>
+                            <input type="text" id="labelHexValue" placeholder="#000000" maxlength="7" />
+                        </div>
+                    </div>
+
+                    <hr />
+                    <button onclick="clearTileCache()" class="warning">🗑️ Очистить кэш карты</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="info-panel">
+        <strong>📊 Статистика путешествий:</strong><br />
+        🏔️ Всего мест: <span id="pointCount">0</span><br />
+        🧵 Связей: <span id="stringCount">0</span><br />
+    </div>
+
+    <div class="distance-info">
+        ✨ Журнал путешественника<br />
+        📍 Добавляйте места<br />
+        🧵 Соединяйте связями
+    </div>
+
+    <!-- Модальное окно редактирования -->
+    <div id="editModal" class="modal">
+        <div class="modal-content" id="editModalContent">
+            <div class="modal-header" id="editModalHeader">
+                <h3>📝 Редактировать место</h3>
+                <span class="close" onclick="closeEditModal()">&times;</span>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label>🏷️ Название:</label>
+                    <input type="text" id="editTitle" placeholder="Название места" />
+                </div>
+                <div class="form-group">
+                    <label>📖 Описание:</label>
+                    <textarea id="editDescription" placeholder="Расскажите об этом месте..."></textarea>
+                </div>
+                <div class="form-group">
+                    <label>📅 Планируемая дата:</label>
+                    <input type="text" id="visitDatePicker" placeholder="дд.мм.гггг" readonly />
+                </div>
+                <div class="form-group">
+                    <label>🎯 Статус:</label>
+                    <div class="status-buttons">
+                        <div class="status-btn planned" onclick="selectStatus('planned', this)">📅 Запланировано</div>
+                        <div class="status-btn visited" onclick="selectStatus('visited', this)">✅ Посещено</div>
+                        <div class="status-btn wish" onclick="selectStatus('wish', this)">⭐ Хочу посетить</div>
+                    </div>
+                    <input type="hidden" id="statusValue" value="planned" />
+                </div>
+                <div class="form-group">
+                    <label>🖼️ Фото (загрузите с устройства):</label>
+                    <input type="file" id="photoFile" accept="image/*" onchange="loadPhotoFromFile(this)" />
+                    <div class="photo-preview" id="photoPreview"></div>
+                    <input type="hidden" id="photoUrl" />
+                </div>
+                <div class="form-group">
+                    <label>🎨 Иконка:</label>
+                    <div class="icon-grid" id="iconSelector">
+                        <div class="icon-option" onclick="selectIcon('📍', this)"><span>📍</span><small>Место</small></div>
+                        <div class="icon-option" onclick="selectIcon('🏔️', this)"><span>🏔️</span><small>Горы</small></div>
+                        <div class="icon-option" onclick="selectIcon('🏖️', this)"><span>🏖️</span><small>Пляж</small></div>
+                        <div class="icon-option" onclick="selectIcon('🏛️', this)"><span>🏛️</span><small>Музей</small></div>
+                        <div class="icon-option" onclick="selectIcon('🍽️', this)"><span>🍽️</span><small>Ресторан</small></div>
+                        <div class="icon-option" onclick="selectIcon('🏨', this)"><span>🏨</span><small>Отель</small></div>
+                        <div class="icon-option" onclick="selectIcon('⛽', this)"><span>⛽</span><small>Заправка</small></div>
+                        <div class="icon-option" onclick="selectIcon('🏕️', this)"><span>🏕️</span><small>Кемпинг</small></div>
+                        <div class="icon-option" onclick="selectIcon('⭐', this)"><span>⭐</span><small>Достоприм.</small></div>
+                        <div class="icon-option" onclick="selectIcon('🎣', this)"><span>🎣</span><small>Рыбалка</small></div>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>🎨 Цвет иконки:</label>
+                    <div class="color-picker-container">
+                        <div class="gradient-palette" id="iconGradientPalette"></div>
+                        <div class="hue-slider" id="iconHueSlider"></div>
+                        <div class="color-info">
+                            <div class="current-color" id="iconCurrentColor"></div>
+                            <input type="text" id="iconHexValue" placeholder="#000000" maxlength="7" />
+                        </div>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>📏 Размер иконки:</label>
+                    <input type="range" id="iconSize" min="24" max="56" value="36" step="1" oninput="updateSizePreview()" />
+                    <span id="sizePreview" style="margin-left: 10px; font-size: 36px;">📍</span>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="save" onclick="savePointEdit()">💾 Сохранить</button>
+                <button class="cancel" onclick="closeEditModal()">❌ Отмена</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Модальное окно связи -->
+    <div id="connectionModal" class="modal">
+        <div class="modal-content" style="width: 380px;">
+            <div class="modal-header" style="background: linear-gradient(135deg, #ed8936 0%, #e53e3e 100%);">
+                <h3>🧵 Новая связь</h3>
+                <span class="close" onclick="closeConnectionModal()">&times;</span>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label>📍 Откуда:</label>
+                    <select id="fromPointSelect"></select>
+                </div>
+                <div class="form-group">
+                    <label>📍 Куда:</label>
+                    <select id="toPointSelect"></select>
+                </div>
+                <div class="form-group">
+                    <label>📝 Описание связи:</label>
+                    <input type="text" id="connectionDescription" placeholder="Например: 2 часа на машине" />
+                </div>
+                <div class="form-group">
+                    <label>🎨 Цвет связи:</label>
+                    <input type="color" id="stringColor" value="#ed8936" />
+                </div>
+                <div class="form-group">
+                    <label>📏 Толщина связи:</label>
+                    <input type="range" id="stringWidth" min="1" max="5" value="2" step="0.5" />
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="save" onclick="addConnection()">✅ Добавить связь</button>
+                <button class="cancel" onclick="closeConnectionModal()">❌ Отмена</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Модальное окно списка точек -->
+    <div id="pointsListModal" class="modal">
+        <div class="modal-content points-list-modal">
+            <div class="modal-header" style="background: linear-gradient(135deg, #48bb78 0%, #38a169 100%);">
+                <h3>📋 Список всех мест</h3>
+                <span class="close" onclick="closePointsListModal()">&times;</span>
+            </div>
+            <div class="modal-body">
+                <div class="points-list" id="pointsListContainer"></div>
+            </div>
+            <div class="modal-footer">
+                <button class="cancel" onclick="closePointsListModal()">Закрыть</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        var map;
+        var markers = [];
+        var strings = [];
+        var currentLines = [];
+        var storageAvailable = false;
+        var currentEditingIndex = -1;
+        var selectedIcon = '📍';
+        var iconColor = '#e2e8f0';
+        var iconSize = 36;
+        var selectedStatus = 'planned';
+        var globalLabelFontSize = 11;
+        var globalLabelColor = '#e2e8f0';
+        var showGlobalLabels = true;
+
+        // Палитра для иконок
+        var iconGradientCanvas = null;
+        var iconHueCanvas = null;
+        var iconCurrentHue = 0;
+
+        // Палитра для названий
+        var labelGradientCanvas = null;
+        var labelHueCanvas = null;
+        var labelCurrentHue = 0;
+
+        function toggleMenu() {
+            var mc = document.getElementById('menuContent');
+            var mh = document.querySelector('.menu-header');
+            if (mc.classList) {
+                mc.classList.toggle('collapsed');
+                mh.classList.toggle('collapsed');
+            }
+        }
+
+        function toggleSection(header) {
+            var content = header.nextElementSibling;
+            if (header.classList) {
+                header.classList.toggle('collapsed');
+                content.classList.toggle('collapsed');
+            }
+        }
+
+        function updateStringCount() {
+            document.getElementById('stringCount').innerText = strings.length;
+        }
+        function updatePointCount() {
+            document.getElementById('pointCount').innerText = markers.length;
+        }
+
+        function escapeHtml(text) {
+            if (!text) return '';
+            return text.replace(/[&<>]/g, function (m) {
+                if (m === '&') return '&amp;';
+                if (m === '<') return '&lt;';
+                if (m === '>') return '&gt;';
+                return m;
+            });
+        }
+
+        function createCurvedLine(sLat, sLng, eLat, eLng, color, weight) {
+            var midLat = (sLat + eLat) / 2;
+            var midLng = (sLng + eLng) / 2;
+            var dx = eLat - sLat;
+            var dy = eLng - sLng;
+            var dist = Math.sqrt(dx * dx + dy * dy);
+            var bend = dist * 0.3;
+            var perpX = -dy / dist;
+            var perpY = dx / dist;
+            var cLat = midLat + perpX * bend;
+            var cLng = midLng + perpY * bend;
+            var points = [];
+            for (var i = 0; i <= 20; i++) {
+                var t = i / 20;
+                var lat = Math.pow(1 - t, 2) * sLat + 2 * (1 - t) * t * cLat + Math.pow(t, 2) * eLat;
+                var lng = Math.pow(1 - t, 2) * sLng + 2 * (1 - t) * t * cLng + Math.pow(t, 2) * eLng;
+                points.push([lat, lng]);
+            }
+            return L.polyline(points, { color: color, weight: weight, opacity: 0.8 });
+        }
+
+        function drawHueGradient(canvas) {
+            if (!canvas) return;
+            var ctx = canvas.getContext('2d');
+            var w = canvas.width;
+            var h = canvas.height;
+            if (w === 0 || h === 0) return;
+            for (var i = 0; i <= w; i++) {
+                var hue = (i / w) * 360;
+                ctx.fillStyle = 'hsl(' + hue + ', 100%, 50%)';
+                ctx.fillRect(i, 0, 1, h);
+            }
+        }
+
+        function drawColorGradient(canvas, hue) {
+            if (!canvas) return;
+            var ctx = canvas.getContext('2d');
+            var w = canvas.width;
+            var h = canvas.height;
+            if (w === 0 || h === 0) return;
+            for (var x = 0; x <= w; x++) {
+                var sat = x / w;
+                for (var y = 0; y <= h; y++) {
+                    var light = 1 - (y / h);
+                    ctx.fillStyle = 'hsl(' + hue + ', ' + (sat * 100) + '%, ' + (light * 50 + 20) + '%)';
+                    ctx.fillRect(x, y, 1, 1);
+                }
+            }
+        }
+
+        function getColorAtPosition(canvas, x, y) {
+            if (!canvas) return '#000000';
+            var ctx = canvas.getContext('2d');
+            var data = ctx.getImageData(x, y, 1, 1).data;
+            var r = data[0];
+            var g = data[1];
+            var b = data[2];
+            return '#' + ((1 << 24) + (r << 16) + (g << 8) + b).toString(16).slice(1);
+        }
+
+        // Инициализация палитры для иконок с принудительным заданием размеров
+        function initIconPicker() {
+            var palette = document.getElementById('iconGradientPalette');
+            var hueSlider = document.getElementById('iconHueSlider');
+            if (!palette || !hueSlider) {
+                console.log('Элементы палитры иконок не найдены');
+                return;
+            }
+
+            // Принудительно задаем размеры
+            palette.style.width = '100%';
+            palette.style.height = '120px';
+
+            // Получаем реальные размеры
+            var width = palette.clientWidth;
+            var height = palette.clientHeight;
+
+            if (width === 0) width = 400;
+            if (height === 0) height = 120;
+
+            iconGradientCanvas = document.createElement('canvas');
+            iconGradientCanvas.width = width;
+            iconGradientCanvas.height = height;
+            iconGradientCanvas.style.cssText = 'width:100%;height:100%';
+            palette.innerHTML = '';
+            palette.appendChild(iconGradientCanvas);
+
+            iconHueCanvas = document.createElement('canvas');
+            iconHueCanvas.width = hueSlider.clientWidth || 400;
+            iconHueCanvas.height = 12;
+            iconHueCanvas.style.cssText = 'width:100%;height:12px';
+            hueSlider.innerHTML = '';
+            hueSlider.appendChild(iconHueCanvas);
+
+            drawHueGradient(iconHueCanvas);
+            drawColorGradient(iconGradientCanvas, iconCurrentHue);
+
+            iconGradientCanvas.onclick = function (e) {
+                var rect = iconGradientCanvas.getBoundingClientRect();
+                var x = e.clientX - rect.left;
+                var y = e.clientY - rect.top;
+                if (x >= 0 && y >= 0 && x <= rect.width && y <= rect.height) {
+                    var color = getColorAtPosition(iconGradientCanvas, x, y);
+                    setIconColor(color);
+                }
+            };
+
+            iconHueCanvas.onclick = function (e) {
+                var rect = iconHueCanvas.getBoundingClientRect();
+                var percent = (e.clientX - rect.left) / rect.width;
+                if (percent < 0) percent = 0;
+                if (percent > 1) percent = 1;
+                iconCurrentHue = percent * 360;
+                drawColorGradient(iconGradientCanvas, iconCurrentHue);
+            };
+
+            console.log('Палитра иконок инициализирована');
+        }
+
+        // Инициализация палитры для названий
+        function initLabelPicker() {
+            var palette = document.getElementById('labelGradientPalette');
+            var hueSlider = document.getElementById('labelHueSlider');
+            if (!palette || !hueSlider) {
+                console.log('Элементы палитры названий не найдены');
+                return;
+            }
+
+            palette.style.width = '100%';
+            palette.style.height = '120px';
+
+            var width = palette.clientWidth;
+            var height = palette.clientHeight;
+
+            if (width === 0) width = 400;
+            if (height === 0) height = 120;
+
+            labelGradientCanvas = document.createElement('canvas');
+            labelGradientCanvas.width = width;
+            labelGradientCanvas.height = height;
+            labelGradientCanvas.style.cssText = 'width:100%;height:100%';
+            palette.innerHTML = '';
+            palette.appendChild(labelGradientCanvas);
+
+            labelHueCanvas = document.createElement('canvas');
+            labelHueCanvas.width = hueSlider.clientWidth || 400;
+            labelHueCanvas.height = 12;
+            labelHueCanvas.style.cssText = 'width:100%;height:12px';
+            hueSlider.innerHTML = '';
+            hueSlider.appendChild(labelHueCanvas);
+
+            drawHueGradient(labelHueCanvas);
+            drawColorGradient(labelGradientCanvas, labelCurrentHue);
+
+            labelGradientCanvas.onclick = function (e) {
+                var rect = labelGradientCanvas.getBoundingClientRect();
+                var x = e.clientX - rect.left;
+                var y = e.clientY - rect.top;
+                if (x >= 0 && y >= 0 && x <= rect.width && y <= rect.height) {
+                    var color = getColorAtPosition(labelGradientCanvas, x, y);
+                    setLabelColor(color);
+                }
+            };
+
+            labelHueCanvas.onclick = function (e) {
+                var rect = labelHueCanvas.getBoundingClientRect();
+                var percent = (e.clientX - rect.left) / rect.width;
+                if (percent < 0) percent = 0;
+                if (percent > 1) percent = 1;
+                labelCurrentHue = percent * 360;
+                drawColorGradient(labelGradientCanvas, labelCurrentHue);
+            };
+
+            console.log('Палитра названий инициализирована');
+        }
+
+        function setIconColor(color) {
+            iconColor = color;
+            var el = document.getElementById('iconCurrentColor');
+            if (el) el.style.backgroundColor = color;
+            var hex = document.getElementById('iconHexValue');
+            if (hex) hex.value = color.toUpperCase();
+            updateSizePreview();
+        }
+
+        function setLabelColor(color) {
+            globalLabelColor = color;
+            var el = document.getElementById('labelCurrentColor');
+            if (el) el.style.backgroundColor = color;
+            var hex = document.getElementById('labelHexValue');
+            if (hex) hex.value = color.toUpperCase();
+            updateGlobalLabelSettings();
+        }
+
+        // HEX обработчики для иконок
+        var iconHexInput = document.getElementById('iconHexValue');
+        if (iconHexInput) {
+            iconHexInput.onchange = function (e) {
+                var c = e.target.value;
+                if (/^#[0-9A-F]{6}$/i.test(c)) setIconColor(c);
+                else if (/^[0-9A-F]{6}$/i.test(c)) setIconColor('#' + c);
+            };
+        }
+
+        // HEX обработчики для названий
+        var labelHexInput = document.getElementById('labelHexValue');
+        if (labelHexInput) {
+            labelHexInput.onchange = function (e) {
+                var c = e.target.value;
+                if (/^#[0-9A-F]{6}$/i.test(c)) setLabelColor(c);
+                else if (/^[0-9A-F]{6}$/i.test(c)) setLabelColor('#' + c);
+            };
+        }
+
+        function initDatePicker() {
+            $("#visitDatePicker").datepicker({ dateFormat: "dd.mm.yy", changeMonth: true, changeYear: true, yearRange: "2020:2030" });
+        }
+
+        function selectStatus(status, el) {
+            selectedStatus = status;
+            var btns = document.querySelectorAll('.status-btn');
+            for (var i = 0; i < btns.length; i++) {
+                btns[i].classList.remove('selected');
+            }
+            el.classList.add('selected');
+            document.getElementById('statusValue').value = status;
+        }
+
+        function loadPhotoFromFile(input) {
+            if (input.files && input.files[0]) {
+                var reader = new FileReader();
+                reader.onload = function (e) {
+                    document.getElementById('photoPreview').innerHTML = '<img src="' + e.target.result + '" />';
+                    document.getElementById('photoUrl').value = e.target.result;
+                };
+                reader.readAsDataURL(input.files[0]);
+            }
+        }
+
+        function updatePhotoPreview() {
+            var url = document.getElementById('photoUrl').value;
+            var preview = document.getElementById('photoPreview');
+            if (url && url.indexOf('data:image') === 0) {
+                preview.innerHTML = '<img src="' + url + '" />';
+            } else {
+                preview.innerHTML = '';
+            }
+        }
+
+        function updateSizePreview() {
+            iconSize = parseInt(document.getElementById('iconSize').value, 10);
+            var sp = document.getElementById('sizePreview');
+            sp.style.fontSize = iconSize + 'px';
+            sp.style.color = iconColor;
+        }
+
+        var CachedTileLayer = L.TileLayer.extend({
+            initialize: function (url, opts) {
+                this._url = url;
+                L.Util.setOptions(this, opts);
+                this._cache = {};
+                this._loadCache();
+            },
+            _loadCache: function () {
+                if (!storageAvailable) return;
+                try {
+                    var data = localStorage.getItem('tile_cache_data');
+                    if (data) this._cache = JSON.parse(data);
+                } catch (e) { }
+            },
+            _saveCache: function () {
+                if (!storageAvailable) return;
+                try {
+                    var keys = Object.keys(this._cache);
+                    if (keys.length > 2000) {
+                        var toRemove = keys.slice(0, keys.length - 2000);
+                        for (var i = 0; i < toRemove.length; i++) {
+                            delete this._cache[toRemove[i]];
+                        }
+                    }
+                    localStorage.setItem('tile_cache_data', JSON.stringify(this._cache));
+                } catch (e) { }
+            },
+            createTile: function (coords, done) {
+                var url = this.getTileUrl(coords);
+                var cached = this._cache[url];
+                var self = this;
+                if (cached && cached.data) {
+                    var img = new Image();
+                    img.src = cached.data;
+                    img.onload = function () { done(null, img); };
+                    img.onerror = function () { done(new Error('Cache error'), null); };
+                    return img;
+                }
+                var img = new Image();
+                img.crossOrigin = '';
+                img.onload = function () {
+                    try {
+                        var canvas = document.createElement('canvas');
+                        canvas.width = img.width;
+                        canvas.height = img.height;
+                        var ctx = canvas.getContext('2d');
+                        ctx.drawImage(img, 0, 0);
+                        var dataUrl = canvas.toDataURL('image/png');
+                        self._cache[url] = { data: dataUrl, timestamp: Date.now() };
+                        self._saveCache();
+                    } catch (e) { }
+                    done(null, img);
+                };
+                img.onerror = function () { done(new Error('Load error'), null); };
+                img.src = url;
+                return img;
+            }
+        });
+
+        function initMap() {
+            try {
+                storageAvailable = (typeof localStorage !== 'undefined');
+            } catch (e) {
+                storageAvailable = false;
+            }
+            var layer = new CachedTileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 18 });
+            map = L.map('map').setView([55.751244, 37.618423], 10);
+            layer.addTo(map);
+            map.on('click', function (e) {
+                var title = prompt('Введите название места:', 'Новое место');
+                if (title && title !== '') addMarker(e.latlng.lat, e.latlng.lng, title);
+            });
+            $("#editModalContent").draggable({ handle: "#editModalHeader", containment: "window" });
+            initDatePicker();
+
+            // Инициализируем палитры с задержкой для гарантии
+            setTimeout(function () {
+                initIconPicker();
+                initLabelPicker();
+            }, 200);
+        }
+
+        function createIcon(emoji, color, size, title, status) {
+            var show = document.getElementById('showLabels').checked;
+            var statusIcon = '';
+            if (status === 'visited') statusIcon = '✅ ';
+            else if (status === 'planned') statusIcon = '📅 ';
+            else statusIcon = '⭐ ';
+            var label = '';
+            if (show && title) {
+                label = '<div style="text-align:center;font-size:' + globalLabelFontSize + 'px;color:' + globalLabelColor + ';font-weight:bold;text-shadow:1px 1px 2px rgba(0,0,0,0.5);margin-top:2px;white-space:nowrap;">' + statusIcon + escapeHtml(title) + '</div>';
+            }
+            return L.divIcon({
+                html: '<div style="text-align:center;line-height:1;">' +
+                    '<div style="font-size:' + size + 'px;color:' + color + ';text-shadow:0 1px 2px rgba(0,0,0,0.3);cursor:pointer;display:inline-block;">' + emoji + '</div>' +
+                    label +
+                    '</div>',
+                iconSize: [size + 10, size + 30],
+                popupAnchor: [0, -size / 2],
+                className: 'custom-marker'
+            });
+        }
+
+        function drawAllStrings() {
+            for (var i = 0; i < currentLines.length; i++) {
+                map.removeLayer(currentLines[i]);
+            }
+            currentLines = [];
+            for (var i = 0; i < strings.length; i++) {
+                var s = strings[i];
+                var fromPoint = markers[s.from];
+                var toPoint = markers[s.to];
+                if (fromPoint && toPoint) {
+                    var line = createCurvedLine(fromPoint.lat, fromPoint.lng, toPoint.lat, toPoint.lng, s.color || '#ed8936', s.width || 2);
+                    line.addTo(map);
+                    if (s.description) line.bindPopup('🧵 ' + s.description);
+                    currentLines.push(line);
+                }
+            }
+        }
+
+        function addMarker(lat, lng, title, emoji, desc, color, size, status, photo, date) {
+            emoji = emoji || '📍';
+            desc = desc || '';
+            color = color || '#e2e8f0';
+            size = size || 36;
+            status = status || 'planned';
+            photo = photo || '';
+            date = date || '';
+            var icon = createIcon(emoji, color, size, title, status);
+            var marker = L.marker([lat, lng], { draggable: true, icon: icon }).addTo(map);
+            var idx = markers.length;
+            var statusText = '';
+            if (status === 'visited') statusText = '✅ Посещено';
+            else if (status === 'planned') statusText = '📅 Запланировано';
+            else statusText = '⭐ Хочу посетить';
+            var popup = '<b>' + escapeHtml(title) + '</b><br/>📍 ' + lat.toFixed(5) + ', ' + lng.toFixed(5) + '<br/>📌 ' + statusText;
+            if (date) popup += '<br/>📅 ' + date;
+            if (desc) popup += '<br/>📖 ' + desc;
+            if (photo) popup += '<br/><img src="' + photo + '" style="max-width:150px;max-height:100px;border-radius:8px;margin-top:5px;" />';
+            popup += '<br/><button onclick="openEditModal(' + idx + ')">✏️ Редактировать</button> <button onclick="removeMarker(' + idx + ')">🗑️ Удалить</button>';
+            marker.bindPopup(popup);
+            marker.on('dragend', function () {
+                var pos = marker.getLatLng();
+                markers[idx].lat = pos.lat;
+                markers[idx].lng = pos.lng;
+                drawAllStrings();
+                saveToCSharp();
+            });
+            marker.on('click', function (e) {
+                openEditModal(idx);
+                if (L.DomEvent) L.DomEvent.stopPropagation(e);
+            });
+            markers.push({
+                marker: marker,
+                lat: lat,
+                lng: lng,
+                title: title,
+                iconEmoji: emoji,
+                description: desc,
+                iconColor: color,
+                iconSize: size,
+                status: status,
+                photoUrl: photo,
+                visitDate: date
+            });
+            updatePointCount();
+            drawAllStrings();
+            saveToCSharp();
+        }
+
+        function updateMarkerIcon(idx) {
+            var m = markers[idx];
+            var show = document.getElementById('showLabels').checked;
+            var statusIcon = '';
+            if (m.status === 'visited') statusIcon = '✅ ';
+            else if (m.status === 'planned') statusIcon = '📅 ';
+            else statusIcon = '⭐ ';
+            var label = '';
+            if (show && m.title) {
+                label = '<div style="text-align:center;font-size:' + globalLabelFontSize + 'px;color:' + globalLabelColor + ';font-weight:bold;text-shadow:1px 1px 2px rgba(0,0,0,0.5);margin-top:2px;white-space:nowrap;">' + statusIcon + escapeHtml(m.title) + '</div>';
+            }
+            var newIcon = L.divIcon({
+                html: '<div style="text-align:center;line-height:1;">' +
+                    '<div style="font-size:' + m.iconSize + 'px;color:' + m.iconColor + ';text-shadow:0 1px 2px rgba(0,0,0,0.3);cursor:pointer;display:inline-block;">' + m.iconEmoji + '</div>' +
+                    label +
+                    '</div>',
+                iconSize: [m.iconSize + 10, m.iconSize + 30],
+                popupAnchor: [0, -m.iconSize / 2],
+                className: 'custom-marker'
+            });
+            m.marker.setIcon(newIcon);
+
+            var statusText = '';
+            if (m.status === 'visited') statusText = '✅ Посещено';
+            else if (m.status === 'planned') statusText = '📅 Запланировано';
+            else statusText = '⭐ Хочу посетить';
+            var popup = '<b>' + escapeHtml(m.title) + '</b><br/>📍 ' + m.lat.toFixed(5) + ', ' + m.lng.toFixed(5) + '<br/>📌 ' + statusText;
+            if (m.visitDate) popup += '<br/>📅 ' + m.visitDate;
+            if (m.description) popup += '<br/>📖 ' + m.description;
+            if (m.photoUrl) popup += '<br/><img src="' + m.photoUrl + '" style="max-width:150px;max-height:100px;border-radius:8px;margin-top:5px;" />';
+            popup += '<br/><button onclick="openEditModal(' + idx + ')">✏️ Редактировать</button> <button onclick="removeMarker(' + idx + ')">🗑️ Удалить</button>';
+            m.marker.bindPopup(popup);
+        }
+
+        function openEditModal(idx) {
+            currentEditingIndex = idx;
+            var p = markers[idx];
+            document.getElementById('editTitle').value = p.title;
+            document.getElementById('editDescription').value = p.description || '';
+            document.getElementById('iconSize').value = p.iconSize || 36;
+            if (p.visitDate) $("#visitDatePicker").val(p.visitDate);
+            else $("#visitDatePicker").val('');
+            document.getElementById('photoUrl').value = p.photoUrl || '';
+            document.getElementById('photoFile').value = '';
+            updatePhotoPreview();
+            selectedIcon = p.iconEmoji;
+            iconColor = p.iconColor || '#e2e8f0';
+            iconSize = p.iconSize || 36;
+            selectedStatus = p.status || 'planned';
+            var btns = document.querySelectorAll('.status-btn');
+            for (var i = 0; i < btns.length; i++) {
+                btns[i].classList.remove('selected');
+            }
+            if (selectedStatus === 'planned') btns[0].classList.add('selected');
+            else if (selectedStatus === 'visited') btns[1].classList.add('selected');
+            else btns[2].classList.add('selected');
+            document.getElementById('statusValue').value = selectedStatus;
+
+            setTimeout(function () {
+                // Перерисовываем палитру иконок
+                if (iconGradientCanvas) {
+                    drawColorGradient(iconGradientCanvas, iconCurrentHue);
+                } else {
+                    initIconPicker();
+                }
+                setIconColor(iconColor);
+            }, 50);
+
+            updateSizePreview();
+            document.getElementById('sizePreview').innerHTML = selectedIcon;
+            var icons = document.querySelectorAll('.icon-option');
+            for (var i = 0; i < icons.length; i++) {
+                icons[i].classList.remove('selected');
+            }
+            for (var i = 0; i < icons.length; i++) {
+                var span = icons[i].querySelector('span');
+                if (span && span.innerText === p.iconEmoji) {
+                    icons[i].classList.add('selected');
+                    break;
+                }
+            }
+            document.getElementById('editModal').style.display = 'block';
+            $("#editModalContent").css({ top: '15%', left: 'calc(50% - 250px)' });
+        }
+
+        function closeEditModal() {
+            document.getElementById('editModal').style.display = 'none';
+            currentEditingIndex = -1;
+        }
+
+        function selectIcon(emoji, el) {
+            selectedIcon = emoji;
+            var icons = document.querySelectorAll('.icon-option');
+            for (var i = 0; i < icons.length; i++) {
+                icons[i].classList.remove('selected');
+            }
+            el.classList.add('selected');
+            document.getElementById('sizePreview').innerHTML = emoji;
+        }
+
+        function savePointEdit() {
+            if (currentEditingIndex >= 0 && markers[currentEditingIndex]) {
+                var p = markers[currentEditingIndex];
+                var newTitle = document.getElementById('editTitle').value;
+                if (newTitle === '') newTitle = 'Новое место';
+                p.title = newTitle;
+                p.description = document.getElementById('editDescription').value;
+                p.iconEmoji = selectedIcon;
+                p.iconColor = iconColor;
+                p.iconSize = parseInt(document.getElementById('iconSize').value, 10);
+                p.status = document.getElementById('statusValue').value;
+                p.photoUrl = document.getElementById('photoUrl').value;
+                p.visitDate = $("#visitDatePicker").val();
+                updateMarkerIcon(currentEditingIndex);
+                drawAllStrings();
+                saveToCSharp();
+            }
+            closeEditModal();
+        }
+
+        function removeMarker(idx) {
+            if (markers[idx]) {
+                var newStrings = [];
+                for (var i = 0; i < strings.length; i++) {
+                    if (strings[i].from !== idx && strings[i].to !== idx) {
+                        newStrings.push(strings[i]);
+                    }
+                }
+                strings = newStrings;
+                for (var i = 0; i < strings.length; i++) {
+                    if (strings[i].from > idx) strings[i].from--;
+                    if (strings[i].to > idx) strings[i].to--;
+                }
+                map.removeLayer(markers[idx].marker);
+                markers.splice(idx, 1);
+                for (var i = 0; i < markers.length; i++) updateMarkerIcon(i);
+                updatePointCount();
+                updateStringCount();
+                drawAllStrings();
+                saveToCSharp();
+            }
+        }
+
+        function addMarkerAtCurrentPosition() {
+            var c = map.getCenter();
+            var title = prompt('Введите название места:', 'Новое место');
+            if (title && title !== '') addMarker(c.lat, c.lng, title);
+        }
+
+        function clearAllMarkers() {
+            if (markers.length > 0 && confirm('Удалить все места?')) {
+                for (var i = 0; i < markers.length; i++) {
+                    map.removeLayer(markers[i].marker);
+                }
+                markers = [];
+                strings = [];
+                updatePointCount();
+                updateStringCount();
+                drawAllStrings();
+                saveToCSharp();
+            }
+        }
+
+        function showPointsList() {
+            var container = document.getElementById('pointsListContainer');
+            if (!container) return;
+            container.innerHTML = '';
+            if (markers.length === 0) {
+                container.innerHTML = '<div style="text-align:center;padding:20px;color:#a0aec0;">Нет добавленных мест</div>';
+                document.getElementById('pointsListModal').style.display = 'block';
+                return;
+            }
+            for (var i = 0; i < markers.length; i++) {
+                var p = markers[i];
+                var statusText = '';
+                if (p.status === 'visited') statusText = '✅ Посещено';
+                else if (p.status === 'planned') statusText = '📅 Запланировано';
+                else statusText = '⭐ Хочу посетить';
+                var div = document.createElement('div');
+                div.className = 'point-list-item';
+                var infoHtml = '<div class="point-list-info"><div class="point-list-icon">' + p.iconEmoji + '</div><div><div class="point-list-title">' + escapeHtml(p.title) + '</div><div class="point-list-status">' + statusText;
+                if (p.visitDate) infoHtml += ' • ' + p.visitDate;
+                infoHtml += '</div></div></div><div class="point-list-actions"><button onclick="focusOnPoint(' + i + ')" class="primary" style="background:#667eea;">🎯 Центрировать</button><button onclick="openEditModal(' + i + ')" style="background:#48bb78;">✏️</button><button onclick="removeMarker(' + i + ')" class="danger" style="background:#e53e3e;">🗑️</button></div>';
+                div.innerHTML = infoHtml;
+                container.appendChild(div);
+            }
+            document.getElementById('pointsListModal').style.display = 'block';
+        }
+
+        function closePointsListModal() {
+            document.getElementById('pointsListModal').style.display = 'none';
+        }
+
+        function focusOnPoint(idx) {
+            if (markers[idx]) {
+                map.setView([markers[idx].lat, markers[idx].lng], 12);
+                markers[idx].marker.openPopup();
+                closePointsListModal();
+            }
+        }
+
+        function showConnectionSelector() {
+            if (markers.length < 2) {
+                alert('Добавьте минимум 2 места');
+                return;
+            }
+            var fromSel = document.getElementById('fromPointSelect');
+            var toSel = document.getElementById('toPointSelect');
+            fromSel.innerHTML = '';
+            toSel.innerHTML = '';
+            for (var i = 0; i < markers.length; i++) {
+                var opt1 = document.createElement('option');
+                opt1.value = i;
+                opt1.text = markers[i].title;
+                fromSel.appendChild(opt1);
+                var opt2 = document.createElement('option');
+                opt2.value = i;
+                opt2.text = markers[i].title;
+                toSel.appendChild(opt2);
+            }
+            if (markers.length > 1) toSel.selectedIndex = 1;
+            document.getElementById('connectionDescription').value = '';
+            document.getElementById('stringColor').value = '#ed8936';
+            document.getElementById('stringWidth').value = '2';
+            document.getElementById('connectionModal').style.display = 'block';
+        }
+
+        function closeConnectionModal() {
+            document.getElementById('connectionModal').style.display = 'none';
+        }
+
+        function addConnection() {
+            var fromIdx = parseInt(document.getElementById('fromPointSelect').value, 10);
+            var toIdx = parseInt(document.getElementById('toPointSelect').value, 10);
+            var desc = document.getElementById('connectionDescription').value;
+            var color = document.getElementById('stringColor').value;
+            var width = parseFloat(document.getElementById('stringWidth').value);
+            if (fromIdx === toIdx) {
+                alert('Нельзя соединить место с самим собой');
+                return;
+            }
+            var exists = false;
+            for (var i = 0; i < strings.length; i++) {
+                if ((strings[i].from === fromIdx && strings[i].to === toIdx) || (strings[i].from === toIdx && strings[i].to === fromIdx)) {
+                    exists = true;
+                    break;
+                }
+            }
+            if (exists) {
+                alert('Такая связь уже есть');
+                return;
+            }
+            strings.push({ from: fromIdx, to: toIdx, description: desc, color: color, width: width });
+            updateStringCount();
+            drawAllStrings();
+            saveToCSharp();
+            closeConnectionModal();
+        }
+
+        function clearAllStrings() {
+            if (strings.length > 0 && confirm('Удалить все связи?')) {
+                strings = [];
+                updateStringCount();
+                drawAllStrings();
+                saveToCSharp();
+            }
+        }
+
+        function updateGlobalLabelSettings() {
+            globalLabelFontSize = parseInt(document.getElementById('globalLabelFontSize').value, 10);
+            for (var i = 0; i < markers.length; i++) updateMarkerIcon(i);
+        }
+
+        function toggleAllLabels() {
+            for (var i = 0; i < markers.length; i++) updateMarkerIcon(i);
+        }
+
+        function clearTileCache() {
+            if (!storageAvailable) {
+                alert('Кэш недоступен');
+                return;
+            }
+            if (confirm('Очистить кэш карты?')) {
+                localStorage.removeItem('tile_cache_data');
+                alert('Кэш очищен, страница перезагрузится');
+                location.reload();
+            }
+        }
+
+        function saveToCSharp() {
+            if (window.external && window.external.NotifyPointsChanged) {
+                var data = exportPoints();
+                window.external.NotifyPointsChanged(JSON.stringify(data));
+            }
+        }
+
+        function exportPoints() {
+            var pointsArr = [];
+            for (var i = 0; i < markers.length; i++) {
+                pointsArr.push({
+                    Latitude: markers[i].lat,
+                    Longitude: markers[i].lng,
+                    Title: markers[i].title,
+                    IconEmoji: markers[i].iconEmoji,
+                    Description: markers[i].description || '',
+                    IconColor: markers[i].iconColor || '#e2e8f0',
+                    IconSize: markers[i].iconSize || 36,
+                    Status: markers[i].status || 'planned',
+                    PhotoUrl: markers[i].photoUrl || '',
+                    VisitDate: markers[i].visitDate || '',
+                    Order: i
+                });
+            }
+            return { points: pointsArr, strings: strings };
+        }
+
+        function loadPoints(data) {
+            try {
+                var parsed = (typeof data === 'string') ? JSON.parse(data) : data;
+                var pts = parsed.points || parsed;
+                var strs = parsed.strings || [];
+                clearAllMarkers();
+                for (var i = 0; i < pts.length; i++) {
+                    addMarker(pts[i].Latitude, pts[i].Longitude, pts[i].Title,
+                        pts[i].IconEmoji, pts[i].Description,
+                        pts[i].IconColor, pts[i].IconSize,
+                        pts[i].Status, pts[i].PhotoUrl, pts[i].VisitDate);
+                }
+                strings = strs;
+                updateStringCount();
+                drawAllStrings();
+                if (pts.length > 0) {
+                    var bounds = [];
+                    for (var i = 0; i < pts.length; i++) {
+                        bounds.push([pts[i].Latitude, pts[i].Longitude]);
+                    }
+                    map.fitBounds(L.latLngBounds(bounds));
+                }
+            } catch (e) {
+                console.error('Ошибка загрузки:', e);
+            }
+        }
+
+        window.onclick = function (e) {
+            var editModal = document.getElementById('editModal');
+            if (e.target === editModal) closeEditModal();
+            var connModal = document.getElementById('connectionModal');
+            if (e.target === connModal) closeConnectionModal();
+            var pointsModal = document.getElementById('pointsListModal');
+            if (e.target === pointsModal) closePointsListModal();
+        };
+
+        window.onload = initMap;
+        window.loadPoints = loadPoints;
+        window.exportPoints = exportPoints;
+        window.openEditModal = openEditModal;
+        window.removeMarker = removeMarker;
+        window.focusOnPoint = focusOnPoint;
+    </script>
+</body>
+</html>
