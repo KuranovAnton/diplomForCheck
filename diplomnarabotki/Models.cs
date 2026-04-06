@@ -8,32 +8,32 @@ namespace diplomnarabotki
     // Типы заметок
     public enum NoteType
     {
-        Text,      // Текстовая заметка
-        List,      // Обычный список
-        Checklist  // Чек-лист с галочками
+        Text,
+        List,
+        Checklist
     }
 
     // Тип повторения уведомления
     public enum ReminderRepeatType
     {
-        None,       // Не повторять
-        EveryMinute, // Каждую минуту
-        Every5Minutes, // Каждые 5 минут
-        Every10Minutes, // Каждые 10 минут
-        Every30Minutes, // Каждые 30 минут
-        EveryHour,   // Каждый час
-        EveryDay,    // Каждый день
-        EveryWeek    // Каждую неделю
+        None,
+        EveryMinute,
+        Every5Minutes,
+        Every10Minutes,
+        Every30Minutes,
+        EveryHour,
+        EveryDay,
+        EveryWeek
     }
 
     // Звуки уведомлений
     public enum NotificationSound
     {
-        Default,    // Стандартный
-        Bell,       // Колокольчик
-        Chime,      // Мелодичный
-        Alert,      // Тревога
-        Gentle      // Мягкий
+        Default,
+        Bell,
+        Chime,
+        Alert,
+        Gentle
     }
 
     // Модель уведомления
@@ -48,51 +48,31 @@ namespace diplomnarabotki
         public DateTime ReminderTime
         {
             get => _reminderTime;
-            set
-            {
-                _reminderTime = value;
-                OnPropertyChanged();
-            }
+            set { _reminderTime = value; OnPropertyChanged(); }
         }
 
         public ReminderRepeatType RepeatType
         {
             get => _repeatType;
-            set
-            {
-                _repeatType = value;
-                OnPropertyChanged();
-            }
+            set { _repeatType = value; OnPropertyChanged(); }
         }
 
         public NotificationSound Sound
         {
             get => _sound;
-            set
-            {
-                _sound = value;
-                OnPropertyChanged();
-            }
+            set { _sound = value; OnPropertyChanged(); }
         }
 
         public bool IsEnabled
         {
             get => _isEnabled;
-            set
-            {
-                _isEnabled = value;
-                OnPropertyChanged();
-            }
+            set { _isEnabled = value; OnPropertyChanged(); }
         }
 
         public DateTime? LastNotified
         {
             get => _lastNotified;
-            set
-            {
-                _lastNotified = value;
-                OnPropertyChanged();
-            }
+            set { _lastNotified = value; OnPropertyChanged(); }
         }
 
         public Notification()
@@ -104,7 +84,6 @@ namespace diplomnarabotki
         }
 
         public event PropertyChangedEventHandler PropertyChanged;
-
         protected virtual void OnPropertyChanged([CallerMemberName] string propertyName = null)
         {
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
@@ -122,41 +101,25 @@ namespace diplomnarabotki
         public string Title
         {
             get => _title;
-            set
-            {
-                _title = value;
-                OnPropertyChanged();
-            }
+            set { _title = value; OnPropertyChanged(); }
         }
 
         public DateTime CreatedDate
         {
             get => _createdDate;
-            set
-            {
-                _createdDate = value;
-                OnPropertyChanged();
-            }
+            set { _createdDate = value; OnPropertyChanged(); }
         }
 
         public NoteType NoteType
         {
             get => _noteType;
-            set
-            {
-                _noteType = value;
-                OnPropertyChanged();
-            }
+            set { _noteType = value; OnPropertyChanged(); }
         }
 
         public Notification Notification
         {
             get => _notification;
-            set
-            {
-                _notification = value;
-                OnPropertyChanged();
-            }
+            set { _notification = value; OnPropertyChanged(); }
         }
 
         public NoteBase()
@@ -166,7 +129,6 @@ namespace diplomnarabotki
         }
 
         public event PropertyChangedEventHandler PropertyChanged;
-
         protected virtual void OnPropertyChanged([CallerMemberName] string propertyName = null)
         {
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
@@ -181,11 +143,7 @@ namespace diplomnarabotki
         public string Content
         {
             get => _content;
-            set
-            {
-                _content = value;
-                OnPropertyChanged();
-            }
+            set { _content = value; OnPropertyChanged(); }
         }
 
         public TextNote()
@@ -194,7 +152,7 @@ namespace diplomnarabotki
         }
     }
 
-    // Элемент списка (для обычного списка)
+    // Элемент списка
     public class ListItem : INotifyPropertyChanged
     {
         private string _text;
@@ -202,15 +160,10 @@ namespace diplomnarabotki
         public string Text
         {
             get => _text;
-            set
-            {
-                _text = value;
-                OnPropertyChanged();
-            }
+            set { _text = value; OnPropertyChanged(); }
         }
 
         public event PropertyChangedEventHandler PropertyChanged;
-
         protected virtual void OnPropertyChanged([CallerMemberName] string propertyName = null)
         {
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
@@ -226,32 +179,23 @@ namespace diplomnarabotki
         public string ItemName
         {
             get => _itemName;
-            set
-            {
-                _itemName = value;
-                OnPropertyChanged();
-            }
+            set { _itemName = value; OnPropertyChanged(); }
         }
 
         public bool IsChecked
         {
             get => _isChecked;
-            set
-            {
-                _isChecked = value;
-                OnPropertyChanged();
-            }
+            set { _isChecked = value; OnPropertyChanged(); }
         }
 
         public event PropertyChangedEventHandler PropertyChanged;
-
         protected virtual void OnPropertyChanged([CallerMemberName] string propertyName = null)
         {
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
         }
     }
 
-    // Список заметка (обычный список)
+    // Список заметка
     public class ListNote : NoteBase
     {
         private ObservableCollection<ListItem> _items;
@@ -259,11 +203,7 @@ namespace diplomnarabotki
         public ObservableCollection<ListItem> Items
         {
             get => _items;
-            set
-            {
-                _items = value;
-                OnPropertyChanged();
-            }
+            set { _items = value; OnPropertyChanged(); }
         }
 
         public ListNote()
@@ -281,11 +221,7 @@ namespace diplomnarabotki
         public ObservableCollection<ChecklistItem> Items
         {
             get => _items;
-            set
-            {
-                _items = value;
-                OnPropertyChanged();
-            }
+            set { _items = value; OnPropertyChanged(); }
         }
 
         public ChecklistNote()
@@ -298,29 +234,29 @@ namespace diplomnarabotki
     // Модель путешествия
     public class Travel : INotifyPropertyChanged
     {
+        private int _id;
         private string _name;
         private string _route;
         private ObservableCollection<NoteBase> _pinnedNotes;
         private ObservableCollection<RoutePoint> _routePoints;
+        private ObservableCollection<TravelString> _travelStrings;
+
+        public int Id
+        {
+            get => _id;
+            set { _id = value; OnPropertyChanged(); }
+        }
 
         public string Name
         {
             get => _name;
-            set
-            {
-                _name = value;
-                OnPropertyChanged();
-            }
+            set { _name = value; OnPropertyChanged(); }
         }
 
         public string Route
         {
             get => _route;
-            set
-            {
-                _route = value;
-                OnPropertyChanged();
-            }
+            set { _route = value; OnPropertyChanged(); }
         }
 
         public ObservableCollection<NoteBase> Notes { get; set; }
@@ -328,22 +264,19 @@ namespace diplomnarabotki
         public ObservableCollection<NoteBase> PinnedNotes
         {
             get => _pinnedNotes;
-            set
-            {
-                _pinnedNotes = value;
-                OnPropertyChanged();
-            }
+            set { _pinnedNotes = value; OnPropertyChanged(); }
         }
 
-        // Точки маршрута
         public ObservableCollection<RoutePoint> RoutePoints
         {
             get => _routePoints;
-            set
-            {
-                _routePoints = value;
-                OnPropertyChanged();
-            }
+            set { _routePoints = value; OnPropertyChanged(); }
+        }
+
+        public ObservableCollection<TravelString> TravelStrings
+        {
+            get => _travelStrings;
+            set { _travelStrings = value; OnPropertyChanged(); }
         }
 
         public Travel()
@@ -351,23 +284,20 @@ namespace diplomnarabotki
             Notes = new ObservableCollection<NoteBase>();
             PinnedNotes = new ObservableCollection<NoteBase>();
             RoutePoints = new ObservableCollection<RoutePoint>();
+            TravelStrings = new ObservableCollection<TravelString>();
         }
 
         public event PropertyChangedEventHandler PropertyChanged;
-
-        protected virtual void OnPropertyChanged([System.Runtime.CompilerServices.CallerMemberName] string propertyName = null)
+        protected virtual void OnPropertyChanged([CallerMemberName] string propertyName = null)
         {
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
         }
     }
 
     // Точка маршрута
-    // Точка маршрута
-    // Точка маршрута
-    // Точка маршрута
-    // Точка маршрута (место в журнале путешественника)
     public class RoutePoint : INotifyPropertyChanged
     {
+        private int _id;
         private double _latitude;
         private double _longitude;
         private string _title;
@@ -380,6 +310,12 @@ namespace diplomnarabotki
         private string _status = "planned";
         private string _photoUrl = "";
         private string _visitDate = "";
+
+        public int Id
+        {
+            get => _id;
+            set { _id = value; OnPropertyChanged(); }
+        }
 
         public double Latitude
         {
@@ -454,21 +390,27 @@ namespace diplomnarabotki
         }
 
         public event PropertyChangedEventHandler PropertyChanged;
-
-        protected virtual void OnPropertyChanged([System.Runtime.CompilerServices.CallerMemberName] string propertyName = null)
+        protected virtual void OnPropertyChanged([CallerMemberName] string propertyName = null)
         {
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
         }
     }
 
-    // Модель соединения (ниточки)
+    // Модель соединения
     public class TravelString : INotifyPropertyChanged
     {
+        private int _id;
         private int _from;
         private int _to;
         private string _description = "";
         private string _color = "#ed8936";
         private double _width = 2;
+
+        public int Id
+        {
+            get => _id;
+            set { _id = value; OnPropertyChanged(); }
+        }
 
         public int From
         {
@@ -501,8 +443,7 @@ namespace diplomnarabotki
         }
 
         public event PropertyChangedEventHandler PropertyChanged;
-
-        protected virtual void OnPropertyChanged([System.Runtime.CompilerServices.CallerMemberName] string propertyName = null)
+        protected virtual void OnPropertyChanged([CallerMemberName] string propertyName = null)
         {
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
         }

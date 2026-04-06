@@ -60,14 +60,25 @@
                         Click="BtnSaveTravel_Click" Width="120" Height="35" Margin="5"
                         Background="#2196F3" Foreground="White" BorderThickness="0"
                         Cursor="Hand" FontWeight="Bold"/>
-                <Button x:Name="BtnLoadTravel" Content="📂 Загрузить" 
-                        Click="BtnLoadTravel_Click" Width="120" Height="35" Margin="5"
-                        Background="#FF9800" Foreground="White" BorderThickness="0"
-                        Cursor="Hand" FontWeight="Bold"/>
+
                 <Button x:Name="BtnOpenMap" Content="🗺️ Карта маршрута" 
                         Click="BtnOpenMap_Click" Width="140" Height="35" Margin="5"
                         Background="#9C27B0" Foreground="White" BorderThickness="0"
                         Cursor="Hand" FontWeight="Bold"/>
+
+                <!-- Отладочная кнопка -->
+                <Button x:Name="BtnDebugRoute" Content="🐛 Проверить" 
+                        Click="BtnDebugRoute_Click" Width="100" Height="35" Margin="5"
+                        Background="#555" Foreground="White" BorderThickness="0"
+                        Cursor="Hand" FontWeight="Bold"/>
+                <Button x:Name="BtnForceSave" Content="💾 Принудительно" 
+        Click="BtnForceSave_Click" Width="120" Height="35" Margin="5"
+        Background="#FF5722" Foreground="White" BorderThickness="0"
+        Cursor="Hand" FontWeight="Bold"/>
+                <Button x:Name="BtnReloadTravels" Content="🔄 Перезагрузить" 
+        Click="BtnReloadTravels_Click" Width="120" Height="35" Margin="5"
+        Background="#17A2B8" Foreground="White" BorderThickness="0"
+        Cursor="Hand" FontWeight="Bold"/>
 
                 <Separator Width="30" Visibility="Collapsed"/>
 
@@ -90,7 +101,8 @@
                     <TextBlock Text="Название:" FontWeight="Bold" Margin="0,5,0,0" 
                                FontSize="12" Foreground="#555"/>
                     <TextBox x:Name="TxtTravelName" TextWrapping="Wrap" Height="35" 
-                             Margin="0,2,0,10" TextChanged="TravelInfo_Changed"
+                             Margin="0,2,0,10" TextChanged="TravelInfo_Changed" 
+                             LostFocus="TxtTravelName_LostFocus"
                              FontSize="12" BorderBrush="#DDD" BorderThickness="1"
                              Padding="5" Background="#FAFAFA"/>
 
@@ -98,6 +110,7 @@
                                FontSize="12" Foreground="#555"/>
                     <TextBox x:Name="TxtRoute" TextWrapping="Wrap" Height="80" 
                              Margin="0,2,0,10" TextChanged="TravelInfo_Changed" 
+                             LostFocus="TxtRoute_LostFocus"
                              AcceptsReturn="True" FontSize="12" BorderBrush="#DDD" 
                              BorderThickness="1" Padding="5" Background="#FAFAFA"
                              VerticalScrollBarVisibility="Auto"/>

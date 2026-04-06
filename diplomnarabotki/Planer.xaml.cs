@@ -9,12 +9,16 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Threading;
+using Microsoft.Data.SqlClient;
 using System.Media;
+using diplomnarabotki.Services;
+using Microsoft.EntityFrameworkCore;
 
 namespace diplomnarabotki
 {
     public partial class Planer : Page
     {
+        private DatabaseService _dbService;
         private ObservableCollection<Travel> _travels;
         private Travel _currentTravel;
         private NoteBase _editingNote;
@@ -32,15 +36,30 @@ namespace diplomnarabotki
         public Planer()
         {
             InitializeComponent();
+            _dbService = new DatabaseService();
         }
 
-        // Также обновим метод Page_Loaded, чтобы убедиться, что все элементы инициализированы
-        private void Page_Loaded(object sender, RoutedEventArgs e)
+        // Обновленный метод Page_Loaded с загрузкой из БД
+        private async void Page_Loaded(object sender, RoutedEventArgs e)
         {
+            await LoadTravelsFromDb();
             InitializeData();
-            LoadTravels();
 
-            // Убеждаемся, что все элементы управления инициализированы перед обновлением
+            await MigrateOldData();
+
+            // Принудительно выбираем первое путешествие и обновляем UI
+            if (CmbTravels.Items.Count > 0)
+            {
+                CmbTravels.SelectedIndex = 0;
+                // Явно вызываем обновление UI
+                if (CmbTravels.SelectedItem is Travel firstTravel)
+                {
+                    TxtTravelName.Text = firstTravel.Name ?? "";
+                    TxtRoute.Text = firstTravel.Route ?? "";
+                    _currentTravel = firstTravel;
+                }
+            }
+
             if (LvPinnedNotes != null)
                 UpdatePinnedNotesDisplay();
 
@@ -48,6 +67,67 @@ namespace diplomnarabotki
                 UpdateNotesDisplay();
 
             InitializeNotificationTimer();
+        }
+
+        private async void BtnReloadTravels_Click(object sender, RoutedEventArgs e)
+        {
+            await LoadTravelsFromDb();
+
+            if (CmbTravels.Items.Count > 0 && CmbTravels.SelectedItem is Travel selected)
+            {
+                TxtTravelName.Text = selected.Name ?? "";
+                TxtRoute.Text = selected.Route ?? "";
+            }
+
+            MessageBox.Show("Путешествия перезагружены из БД!", "Успех",
+                MessageBoxButton.OK, MessageBoxImage.Information);
+        }
+
+        // Загрузка путешествий из базы данных
+        private async Task LoadTravelsFromDb()
+        {
+            try
+            {
+                _travels = await _dbService.LoadAllTravelsAsync();
+                CmbTravels.ItemsSource = _travels;
+                CmbTravels.DisplayMemberPath = "Name";
+
+                if (_travels.Count > 0)
+                {
+                    CmbTravels.SelectedIndex = 0;
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Ошибка загрузки из БД: {ex.Message}\n\nБудет использован JSON файл.",
+                    "Ошибка", MessageBoxButton.OK, MessageBoxImage.Warning);
+                LoadTravels();
+            }
+        }
+
+        // Миграция данных из JSON в БД
+        private async Task MigrateOldData()
+        {
+            string jsonPath = "travels.json";
+            if (File.Exists(jsonPath) && _travels.Count == 0)
+            {
+                var result = MessageBox.Show("Обнаружены старые данные в JSON файле.\nИмпортировать их в базу данных?",
+                    "Миграция данных", MessageBoxButton.YesNo, MessageBoxImage.Question);
+
+                if (result == MessageBoxResult.Yes)
+                {
+                    await _dbService.MigrateFromJsonAsync(jsonPath);
+                    await LoadTravelsFromDb();
+
+                    // Переименовываем старый файл как резервную копию
+                    if (File.Exists(jsonPath + ".backup"))
+                        File.Delete(jsonPath + ".backup");
+                    File.Move(jsonPath, jsonPath + ".backup");
+
+                    MessageBox.Show("Данные успешно импортированы в базу данных!",
+                        "Успех", MessageBoxButton.OK, MessageBoxImage.Information);
+                }
+            }
         }
 
         private void InitializeNotificationTimer()
@@ -81,7 +161,7 @@ namespace diplomnarabotki
             }
         }
 
-        private void CheckAndNotify(NoteBase note, DateTime currentTime)
+        private async void CheckAndNotify(NoteBase note, DateTime currentTime)
         {
             var notification = note.Notification;
             if (notification == null) return;
@@ -169,7 +249,7 @@ namespace diplomnarabotki
                     notification.ReminderTime = nextNotifyTime.Value;
                 }
 
-                SaveTravels();
+                await _dbService.SaveTravelAsync(_currentTravel);
                 UpdateNotesDisplay();
             }
         }
@@ -242,10 +322,8 @@ namespace diplomnarabotki
         {
             if (_currentTravel == null) return;
 
-            // Проверяем, что ListBox инициализирован
             if (LbNotes == null) return;
 
-            // Создаем список всех заметок с данными для отображения
             _allNotes = _currentTravel.Notes.Select(note => new NoteDisplayItem
             {
                 Note = note,
@@ -260,35 +338,23 @@ namespace diplomnarabotki
                 SearchHighlight = string.Empty
             }).ToList();
 
-            // Применяем поиск и фильтрацию
             ApplySearchAndFilter();
         }
 
-
-        // Применение поиска и фильтрации
         private void ApplySearchAndFilter()
         {
             if (_allNotes == null) return;
-
-            // Проверяем, что ListBox инициализирован
             if (LbNotes == null) return;
 
             var filteredNotes = _allNotes.AsEnumerable();
-
-            // Применяем фильтр по типу
             filteredNotes = ApplyTypeFilter(filteredNotes);
-
-            // Применяем поиск
             filteredNotes = ApplySearchFilter(filteredNotes);
 
             var resultList = filteredNotes.ToList();
             LbNotes.ItemsSource = resultList;
-
-            // Обновляем информацию о результатах поиска
             UpdateSearchResultsInfo(resultList.Count, _allNotes.Count);
         }
 
-        // Фильтрация по типу заметки
         private IEnumerable<NoteDisplayItem> ApplyTypeFilter(IEnumerable<NoteDisplayItem> notes)
         {
             if (string.IsNullOrEmpty(_currentFilterType))
@@ -310,12 +376,10 @@ namespace diplomnarabotki
             }
         }
 
-        // Поиск по тексту
         private IEnumerable<NoteDisplayItem> ApplySearchFilter(IEnumerable<NoteDisplayItem> notes)
         {
             if (string.IsNullOrWhiteSpace(_currentSearchText))
             {
-                // Если поиск пуст, сбрасываем подсветку
                 foreach (var note in notes)
                 {
                     note.HasSearchMatch = false;
@@ -332,14 +396,12 @@ namespace diplomnarabotki
                 bool hasMatch = false;
                 var matchedFields = new List<string>();
 
-                // Проверяем заголовок
                 if (note.Title.ToLower().Contains(searchText))
                 {
                     hasMatch = true;
                     matchedFields.Add($"заголовке: \"{HighlightText(note.Title, searchText)}\"");
                 }
 
-                // Проверяем содержимое в зависимости от типа заметки
                 string contentForSearch = GetNoteContentForSearch(note.Note);
                 if (contentForSearch.ToLower().Contains(searchText))
                 {
@@ -348,7 +410,6 @@ namespace diplomnarabotki
                     matchedFields.Add($"содержимом: {highlightedContent}");
                 }
 
-                // Проверяем уведомления
                 if (note.NotificationInfo.ToLower().Contains(searchText))
                 {
                     hasMatch = true;
@@ -369,7 +430,6 @@ namespace diplomnarabotki
             return result;
         }
 
-        // Получение содержимого заметки для поиска
         private string GetNoteContentForSearch(NoteBase note)
         {
             switch (note)
@@ -385,7 +445,6 @@ namespace diplomnarabotki
             }
         }
 
-        // Подсветка найденного текста
         private string HighlightText(string text, string searchText)
         {
             if (string.IsNullOrEmpty(text) || string.IsNullOrEmpty(searchText))
@@ -401,7 +460,6 @@ namespace diplomnarabotki
                 var match = text.Substring(index, searchText.Length);
                 var after = text.Substring(index + searchText.Length);
 
-                // Ограничиваем длину для отображения
                 if (before.Length > 30)
                 {
                     before = "..." + before.Substring(before.Length - 30);
@@ -419,7 +477,6 @@ namespace diplomnarabotki
 
         private void UpdateSearchResultsInfo(int filteredCount, int totalCount)
         {
-            // Проверяем, что TextBlock инициализирован
             if (TxtSearchResults == null) return;
 
             if (!string.IsNullOrWhiteSpace(_currentSearchText) || _currentFilterType != "All")
@@ -442,7 +499,6 @@ namespace diplomnarabotki
                     TxtSearchResults.Text = $"📋 Показано {filteredCount} из {totalCount} заметок{filterInfo}";
                 }
 
-                // Если ничего не найдено, показываем сообщение
                 if (filteredCount == 0)
                 {
                     TxtSearchResults.Text += "\n⚠️ Ничего не найдено. Попробуйте изменить поисковый запрос или фильтр.";
@@ -482,7 +538,9 @@ namespace diplomnarabotki
 
         private void InitializeData()
         {
-            _travels = new ObservableCollection<Travel>();
+            if (_travels == null)
+                _travels = new ObservableCollection<Travel>();
+
             CmbTravels.ItemsSource = _travels;
             CmbTravels.DisplayMemberPath = "Name";
 
@@ -525,22 +583,58 @@ namespace diplomnarabotki
             }
         }
 
-        private void SaveTravels()
+        private async void SaveTravels()
         {
             try
             {
-                var options = new JsonSerializerOptions
+                if (_currentTravel != null)
                 {
-                    WriteIndented = true,
-                    IncludeFields = false
-                };
-                string json = JsonSerializer.Serialize(_travels, options);
-                File.WriteAllText(_saveFilePath, json);
+                    // Принудительно обновляем модель из UI перед сохранением
+                    _currentTravel.Name = TxtTravelName.Text;
+                    _currentTravel.Route = TxtRoute.Text;
+
+                    System.Diagnostics.Debug.WriteLine($"=== SaveTravels ===");
+                    System.Diagnostics.Debug.WriteLine($"Saving Travel Id: {_currentTravel.Id}");
+                    System.Diagnostics.Debug.WriteLine($"Saving Name: '{_currentTravel.Name}'");
+                    System.Diagnostics.Debug.WriteLine($"Saving Route: '{_currentTravel.Route}'");
+
+                    await _dbService.SaveTravelAsync(_currentTravel);
+
+                    System.Diagnostics.Debug.WriteLine($"Save completed successfully");
+                }
             }
             catch (Exception ex)
             {
-                MessageBox.Show($"Ошибка сохранения: {ex.Message}", "Ошибка",
-                    MessageBoxButton.OK, MessageBoxImage.Error);
+                System.Diagnostics.Debug.WriteLine($"Save error: {ex.Message}");
+
+                MessageBox.Show($"Ошибка сохранения в БД: {ex.Message}\n\nПопытка сохранить в JSON...", "Ошибка",
+                    MessageBoxButton.OK, MessageBoxImage.Warning);
+
+                try
+                {
+                    // При сохранении в JSON тоже обновляем модель
+                    if (_currentTravel != null)
+                    {
+                        _currentTravel.Name = TxtTravelName.Text;
+                        _currentTravel.Route = TxtRoute.Text;
+                    }
+
+                    var options = new JsonSerializerOptions
+                    {
+                        WriteIndented = true,
+                        IncludeFields = false
+                    };
+                    string json = JsonSerializer.Serialize(_travels, options);
+                    File.WriteAllText(_saveFilePath, json);
+
+                    System.Diagnostics.Debug.WriteLine($"Saved to JSON as backup");
+                }
+                catch (Exception jsonEx)
+                {
+                    System.Diagnostics.Debug.WriteLine($"JSON save error: {jsonEx.Message}");
+                    MessageBox.Show($"Ошибка сохранения в JSON: {jsonEx.Message}", "Ошибка",
+                        MessageBoxButton.OK, MessageBoxImage.Error);
+                }
             }
         }
 
@@ -550,21 +644,19 @@ namespace diplomnarabotki
             {
                 _currentTravel.Name = TxtTravelName.Text;
                 _currentTravel.Route = TxtRoute.Text;
+                System.Diagnostics.Debug.WriteLine($"UpdateCurrentTravel: Name='{_currentTravel.Name}', Route='{_currentTravel.Route}'");
             }
         }
 
-        // Обновленный метод LoadTravelToUI с проверками
         private void LoadTravelToUI(Travel travel)
         {
             if (travel == null) return;
 
-            if (TxtTravelName != null)
-                TxtTravelName.Text = travel.Name;
+            TxtTravelName.Text = travel.Name ?? "";
+            TxtRoute.Text = travel.Route ?? "";
 
-            if (TxtRoute != null)
-                TxtRoute.Text = travel.Route;
+            System.Diagnostics.Debug.WriteLine($"LoadTravelToUI: Name={travel.Name}, Route={travel.Route}");
 
-            // Сбрасываем поиск и фильтры при загрузке нового путешествия
             _currentSearchText = string.Empty;
             _currentFilterType = "All";
 
@@ -578,8 +670,6 @@ namespace diplomnarabotki
             UpdatePinnedNotesDisplay();
         }
 
-
-        // Вспомогательный класс для отображения заметок
         private class NoteDisplayItem : INotifyPropertyChanged
         {
             private NoteBase _note;
@@ -596,105 +686,64 @@ namespace diplomnarabotki
             public NoteBase Note
             {
                 get => _note;
-                set
-                {
-                    _note = value;
-                    OnPropertyChanged();
-                }
+                set { _note = value; OnPropertyChanged(); }
             }
 
             public string Title
             {
                 get => _title;
-                set
-                {
-                    _title = value;
-                    OnPropertyChanged();
-                }
+                set { _title = value; OnPropertyChanged(); }
             }
 
             public string PreviewText
             {
                 get => _previewText;
-                set
-                {
-                    _previewText = value;
-                    OnPropertyChanged();
-                }
+                set { _previewText = value; OnPropertyChanged(); }
             }
 
             public string Icon
             {
                 get => _icon;
-                set
-                {
-                    _icon = value;
-                    OnPropertyChanged();
-                }
+                set { _icon = value; OnPropertyChanged(); }
             }
 
             public DateTime CreatedDate
             {
                 get => _createdDate;
-                set
-                {
-                    _createdDate = value;
-                    OnPropertyChanged();
-                }
+                set { _createdDate = value; OnPropertyChanged(); }
             }
 
             public NoteType NoteType
             {
                 get => _noteType;
-                set
-                {
-                    _noteType = value;
-                    OnPropertyChanged();
-                }
+                set { _noteType = value; OnPropertyChanged(); }
             }
 
             public bool HasNotification
             {
                 get => _hasNotification;
-                set
-                {
-                    _hasNotification = value;
-                    OnPropertyChanged();
-                }
+                set { _hasNotification = value; OnPropertyChanged(); }
             }
 
             public string NotificationInfo
             {
                 get => _notificationInfo;
-                set
-                {
-                    _notificationInfo = value;
-                    OnPropertyChanged();
-                }
+                set { _notificationInfo = value; OnPropertyChanged(); }
             }
 
             public bool HasSearchMatch
             {
                 get => _hasSearchMatch;
-                set
-                {
-                    _hasSearchMatch = value;
-                    OnPropertyChanged();
-                }
+                set { _hasSearchMatch = value; OnPropertyChanged(); }
             }
 
             public string SearchHighlight
             {
                 get => _searchHighlight;
-                set
-                {
-                    _searchHighlight = value;
-                    OnPropertyChanged();
-                }
+                set { _searchHighlight = value; OnPropertyChanged(); }
             }
 
             public event PropertyChangedEventHandler PropertyChanged;
-
             protected virtual void OnPropertyChanged([CallerMemberName] string propertyName = null)
             {
                 PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
@@ -734,7 +783,6 @@ namespace diplomnarabotki
             }
         }
 
-        // Обновленный метод UpdatePinnedNotesDisplay с проверками
         private void UpdatePinnedNotesDisplay()
         {
             if (_currentTravel?.PinnedNotes == null)
@@ -763,7 +811,7 @@ namespace diplomnarabotki
             }
         }
 
-        private void RemovePinnedNote_Click(object sender, RoutedEventArgs e)
+        private async void RemovePinnedNote_Click(object sender, RoutedEventArgs e)
         {
             var button = sender as Button;
             var note = button?.Tag as NoteBase;
@@ -775,7 +823,7 @@ namespace diplomnarabotki
                 {
                     _currentTravel.PinnedNotes.Remove(note);
                     UpdatePinnedNotesDisplay();
-                    SaveTravels();
+                    await _dbService.SaveTravelAsync(_currentTravel);
 
                     MessageBox.Show("Заметка удалена из закрепленных!", "Успех",
                         MessageBoxButton.OK, MessageBoxImage.Information);
@@ -866,7 +914,7 @@ namespace diplomnarabotki
             e.Handled = true;
         }
 
-        private void PinnedNotesArea_Drop(object sender, DragEventArgs e)
+        private async void PinnedNotesArea_Drop(object sender, DragEventArgs e)
         {
             try
             {
@@ -889,10 +937,21 @@ namespace diplomnarabotki
                         {
                             _currentTravel.PinnedNotes.Add(droppedNote);
                             UpdatePinnedNotesDisplay();
-                            SaveTravels();
 
-                            MessageBox.Show($"Заметка \"{droppedNote.Title}\" добавлена в закрепленные!",
-                                "Успех", MessageBoxButton.OK, MessageBoxImage.Information);
+                            try
+                            {
+                                await _dbService.SaveTravelAsync(_currentTravel);
+                                MessageBox.Show($"Заметка \"{droppedNote.Title}\" добавлена в закрепленные!",
+                                    "Успех", MessageBoxButton.OK, MessageBoxImage.Information);
+                            }
+                            catch (Exception saveEx)
+                            {
+                                _currentTravel.PinnedNotes.Remove(droppedNote);
+                                UpdatePinnedNotesDisplay();
+                                MessageBox.Show($"Ошибка сохранения: {saveEx.Message}\n\n" +
+                                    "Пожалуйста, проверьте данные заметки (особенно элементы с цифрами).",
+                                    "Ошибка", MessageBoxButton.OK, MessageBoxImage.Error);
+                            }
                         }
                         else
                         {
@@ -910,7 +969,7 @@ namespace diplomnarabotki
             e.Handled = true;
         }
 
-        private void BtnNewTravel_Click(object sender, RoutedEventArgs e)
+        private async void BtnNewTravel_Click(object sender, RoutedEventArgs e)
         {
             var newTravel = new Travel
             {
@@ -918,23 +977,74 @@ namespace diplomnarabotki
                 Route = "Введите маршрут..."
             };
 
-            _travels.Add(newTravel);
+            await _dbService.SaveTravelAsync(newTravel);
+            await LoadTravelsFromDb();
             CmbTravels.SelectedItem = newTravel;
-            SaveTravels();
         }
 
-        private void BtnSaveTravel_Click(object sender, RoutedEventArgs e)
+        private async void BtnSaveTravel_Click(object sender, RoutedEventArgs e)
         {
-            UpdateCurrentTravel();
-            SaveTravels();
-            MessageBox.Show("Путешествие сохранено!", "Успех",
-                MessageBoxButton.OK, MessageBoxImage.Information);
+            if (_currentTravel != null)
+            {
+                // Обновляем модель перед сохранением
+                _currentTravel.Name = TxtTravelName.Text;
+                _currentTravel.Route = TxtRoute.Text;
+
+                System.Diagnostics.Debug.WriteLine($"=== BtnSaveTravel_Click ===");
+                System.Diagnostics.Debug.WriteLine($"Name: '{_currentTravel.Name}'");
+                System.Diagnostics.Debug.WriteLine($"Route: '{_currentTravel.Route}'");
+
+                try
+                {
+                    await _dbService.SaveTravelAsync(_currentTravel);
+                    MessageBox.Show("Путешествие сохранено в базу данных!", "Успех",
+                        MessageBoxButton.OK, MessageBoxImage.Information);
+                }
+                catch (Exception ex)
+                {
+                    MessageBox.Show($"Ошибка сохранения: {ex.Message}", "Ошибка",
+                        MessageBoxButton.OK, MessageBoxImage.Error);
+                }
+            }
+        }
+
+        private async void BtnForceSave_Click(object sender, RoutedEventArgs e)
+        {
+            if (_currentTravel != null)
+            {
+                _currentTravel.Name = TxtTravelName.Text;
+                _currentTravel.Route = TxtRoute.Text;
+
+                // Прямой SQL запрос для проверки
+                using var connection = new Microsoft.Data.SqlClient.SqlConnection(
+                    "Server=DESKTOP-11PGGLI\\SQLEXPRESS;Database=TravelJournalDb;Trusted_Connection=True;TrustServerCertificate=True");
+
+                await connection.OpenAsync();
+
+                var command = new Microsoft.Data.SqlClient.SqlCommand(
+                    "UPDATE Travels SET Name = @Name, Route = @Route WHERE Id = @Id", connection);
+                command.Parameters.AddWithValue("@Id", _currentTravel.Id);
+                command.Parameters.AddWithValue("@Name", _currentTravel.Name);
+                command.Parameters.AddWithValue("@Route", _currentTravel.Route ?? "");
+
+                int rows = await command.ExecuteNonQueryAsync();
+
+                if (rows > 0)
+                {
+                    MessageBox.Show($"Принудительно сохранено!\nName: {_currentTravel.Name}\nRoute: {_currentTravel.Route}",
+                        "Успех", MessageBoxButton.OK, MessageBoxImage.Information);
+                }
+                else
+                {
+                    MessageBox.Show("Ничего не обновлено!", "Ошибка", MessageBoxButton.OK, MessageBoxImage.Error);
+                }
+            }
         }
 
         private void BtnLoadTravel_Click(object sender, RoutedEventArgs e)
         {
             LoadTravels();
-            MessageBox.Show("Данные загружены!", "Успех",
+            MessageBox.Show("Данные загружены из JSON!", "Успех",
                 MessageBoxButton.OK, MessageBoxImage.Information);
         }
 
@@ -943,7 +1053,31 @@ namespace diplomnarabotki
             if (CmbTravels.SelectedItem is Travel selectedTravel)
             {
                 _currentTravel = selectedTravel;
-                LoadTravelToUI(_currentTravel);
+
+                System.Diagnostics.Debug.WriteLine("=== Travel Selected ===");
+                System.Diagnostics.Debug.WriteLine($"Id: {_currentTravel.Id}");
+                System.Diagnostics.Debug.WriteLine($"Name from model: '{_currentTravel.Name}'");
+                System.Diagnostics.Debug.WriteLine($"Route from model: '{_currentTravel.Route}'");
+
+                // Прямое присвоение в UI
+                TxtTravelName.Text = _currentTravel.Name ?? "";
+                TxtRoute.Text = _currentTravel.Route ?? "";
+
+                System.Diagnostics.Debug.WriteLine($"UI Name set to: '{TxtTravelName.Text}'");
+                System.Diagnostics.Debug.WriteLine($"UI Route set to: '{TxtRoute.Text}'");
+
+                // Обновляем остальные элементы
+                _currentSearchText = string.Empty;
+                _currentFilterType = "All";
+
+                if (TxtSearchNotes != null)
+                    TxtSearchNotes.Text = string.Empty;
+
+                if (CmbFilterType != null && CmbFilterType.SelectedIndex != 0)
+                    CmbFilterType.SelectedIndex = 0;
+
+                UpdateNotesDisplay();
+                UpdatePinnedNotesDisplay();
             }
         }
 
@@ -952,10 +1086,37 @@ namespace diplomnarabotki
             UpdateCurrentTravel();
         }
 
-        // Обработчики поиска и фильтрации
+        private void TxtRoute_LostFocus(object sender, RoutedEventArgs e)
+        {
+            UpdateCurrentTravel();
+            System.Diagnostics.Debug.WriteLine($"TxtRoute_LostFocus: Route={TxtRoute.Text}");
+        }
+
+        private void TxtTravelName_LostFocus(object sender, RoutedEventArgs e)
+        {
+            UpdateCurrentTravel();
+            System.Diagnostics.Debug.WriteLine($"TxtTravelName_LostFocus: Name={TxtTravelName.Text}");
+        }
+
+        private void BtnDebugRoute_Click(object sender, RoutedEventArgs e)
+        {
+            if (_currentTravel != null)
+            {
+                MessageBox.Show($"Текущее путешествие:\n" +
+                                $"Id: {_currentTravel.Id}\n" +
+                                $"Name: {_currentTravel.Name}\n" +
+                                $"Route: {_currentTravel.Route}\n" +
+                                $"Текст из UI Name: {TxtTravelName.Text}\n" +
+                                $"Текст из UI Route: {TxtRoute.Text}");
+            }
+            else
+            {
+                MessageBox.Show("_currentTravel = null");
+            }
+        }
+
         private void TxtSearchNotes_TextChanged(object sender, TextChangedEventArgs e)
         {
-            // Проверяем, что TextBox инициализирован
             if (TxtSearchNotes == null) return;
 
             _currentSearchText = TxtSearchNotes.Text;
@@ -964,12 +1125,10 @@ namespace diplomnarabotki
 
         private void CmbFilterType_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
-            // Проверяем, что ComboBox инициализирован
             if (CmbFilterType == null || CmbFilterType.SelectedItem == null) return;
 
             if (CmbFilterType.SelectedItem is ComboBoxItem selectedItem)
             {
-                // Используем Content для определения типа, так как Tag может быть null
                 string content = selectedItem.Content?.ToString() ?? string.Empty;
 
                 if (content.Contains("Все"))
@@ -991,17 +1150,13 @@ namespace diplomnarabotki
 
         private void BtnClearSearch_Click(object sender, RoutedEventArgs e)
         {
-            // Проверяем, что элементы управления инициализированы
             if (TxtSearchNotes == null || CmbFilterType == null) return;
 
-            // Очищаем поиск
             TxtSearchNotes.Text = string.Empty;
             _currentSearchText = string.Empty;
 
-            // Сбрасываем фильтр на "Все заметки"
             if (CmbFilterType.Items.Count > 0)
             {
-                // Ищем элемент с "Все заметки"
                 for (int i = 0; i < CmbFilterType.Items.Count; i++)
                 {
                     if (CmbFilterType.Items[i] is ComboBoxItem item)
@@ -1015,7 +1170,6 @@ namespace diplomnarabotki
                     }
                 }
 
-                // Если не нашли, выбираем первый элемент
                 if (CmbFilterType.SelectedIndex == -1 && CmbFilterType.Items.Count > 0)
                 {
                     CmbFilterType.SelectedIndex = 0;
@@ -1023,7 +1177,6 @@ namespace diplomnarabotki
             }
             else
             {
-                // Если нет элементов, просто применяем фильтр
                 ApplySearchAndFilter();
             }
         }
@@ -1057,7 +1210,6 @@ namespace diplomnarabotki
             if (ChecklistNotePanel != null)
                 ChecklistNotePanel.Visibility = Visibility.Collapsed;
 
-            // Сброс настроек уведомлений
             if (ChkEnableNotification != null)
                 ChkEnableNotification.IsChecked = false;
 
@@ -1173,7 +1325,7 @@ namespace diplomnarabotki
             }
         }
 
-        private void BtnSaveNote_Click(object sender, RoutedEventArgs e)
+        private async void BtnSaveNote_Click(object sender, RoutedEventArgs e)
         {
             if (string.IsNullOrWhiteSpace(TxtNoteTitle.Text))
             {
@@ -1212,6 +1364,21 @@ namespace diplomnarabotki
                                     MessageBoxButton.OK, MessageBoxImage.Warning);
                                 return;
                             }
+
+                            foreach (var item in listItems)
+                            {
+                                if (string.IsNullOrWhiteSpace(item.Text))
+                                {
+                                    MessageBox.Show("Названия элементов списка не могут быть пустыми!",
+                                        "Ошибка", MessageBoxButton.OK, MessageBoxImage.Warning);
+                                    return;
+                                }
+                                if (item.Text.Length > 500)
+                                {
+                                    item.Text = item.Text.Substring(0, 500);
+                                }
+                            }
+
                             newNote = new ListNote
                             {
                                 Title = TxtNoteTitle.Text,
@@ -1229,6 +1396,28 @@ namespace diplomnarabotki
                                     MessageBoxButton.OK, MessageBoxImage.Warning);
                                 return;
                             }
+
+                            var invalidItems = new List<string>();
+                            foreach (var item in checklistItems)
+                            {
+                                if (string.IsNullOrWhiteSpace(item.ItemName))
+                                {
+                                    invalidItems.Add("(пустое название)");
+                                }
+                                else if (item.ItemName.Length > 500)
+                                {
+                                    item.ItemName = item.ItemName.Substring(0, 500);
+                                }
+                            }
+
+                            if (invalidItems.Any())
+                            {
+                                MessageBox.Show($"Обнаружены элементы с пустыми названиями!\n\n" +
+                                    $"Пожалуйста, заполните все названия элементов чек-листа.",
+                                    "Ошибка", MessageBoxButton.OK, MessageBoxImage.Warning);
+                                return;
+                            }
+
                             newNote = new ChecklistNote
                             {
                                 Title = TxtNoteTitle.Text,
@@ -1240,7 +1429,6 @@ namespace diplomnarabotki
 
                 if (newNote != null)
                 {
-                    // Сохраняем настройки уведомлений
                     if (ChkEnableNotification.IsChecked == true)
                     {
                         var reminderTime = DatePickerReminder.SelectedDate ?? DateTime.Now;
@@ -1268,35 +1456,108 @@ namespace diplomnarabotki
                         newNote.Notification = new Notification { IsEnabled = false };
                     }
 
-                    if (_editingNote == null)
+                    try
                     {
-                        _currentTravel.Notes.Add(newNote);
-                    }
-                    else
-                    {
-                        int index = _currentTravel.Notes.IndexOf(_editingNote);
-                        _currentTravel.Notes[index] = newNote;
-
-                        var pinnedIndex = _currentTravel.PinnedNotes.IndexOf(_editingNote);
-                        if (pinnedIndex >= 0)
+                        if (_editingNote == null)
                         {
-                            _currentTravel.PinnedNotes[pinnedIndex] = newNote;
+                            _currentTravel.Notes.Add(newNote);
                         }
-                    }
+                        else
+                        {
+                            int index = _currentTravel.Notes.IndexOf(_editingNote);
+                            _currentTravel.Notes[index] = newNote;
 
-                    LoadTravelToUI(_currentTravel);
+                            var pinnedIndex = _currentTravel.PinnedNotes.IndexOf(_editingNote);
+                            if (pinnedIndex >= 0)
+                            {
+                                _currentTravel.PinnedNotes[pinnedIndex] = newNote;
+                            }
+                        }
+
+                        await _dbService.SaveTravelAsync(_currentTravel);
+                        LoadTravelToUI(_currentTravel);
+
+                        NoteDialog.Visibility = Visibility.Collapsed;
+                        RefreshNotesDisplay();
+
+                        MessageBox.Show("Заметка успешно сохранена!", "Успех",
+                            MessageBoxButton.OK, MessageBoxImage.Information);
+                    }
+                    catch (Exception ex)
+                    {
+                        if (_editingNote == null)
+                        {
+                            _currentTravel.Notes.Remove(newNote);
+                        }
+
+                        MessageBox.Show($"Ошибка при сохранении заметки: {ex.Message}\n\n" +
+                            $"Пожалуйста, проверьте:\n" +
+                            $"- Все ли поля заполнены корректно\n" +
+                            $"- Нет ли пустых названий в элементах\n" +
+                            $"- Не слишком ли длинные названия (максимум 500 символов)",
+                            "Ошибка", MessageBoxButton.OK, MessageBoxImage.Error);
+                        return;
+                    }
                 }
             }
 
             NoteDialog.Visibility = Visibility.Collapsed;
-            SaveTravels();
             RefreshNotesDisplay();
         }
 
-        // Обновленный метод RefreshNotesDisplay
+        private void ValidateAndCleanNoteData(NoteBase note)
+        {
+            if (string.IsNullOrWhiteSpace(note.Title))
+            {
+                throw new Exception("Заголовок заметки не может быть пустым");
+            }
+
+            if (note.Title.Length > 200)
+            {
+                note.Title = note.Title.Substring(0, 200);
+            }
+
+            switch (note)
+            {
+                case TextNote textNote:
+                    if (textNote.Content?.Length > 10000)
+                    {
+                        textNote.Content = textNote.Content.Substring(0, 10000);
+                    }
+                    break;
+
+                case ListNote listNote:
+                    for (int i = 0; i < listNote.Items.Count; i++)
+                    {
+                        if (string.IsNullOrWhiteSpace(listNote.Items[i].Text))
+                        {
+                            throw new Exception($"Элемент списка под номером {i + 1} не может быть пустым");
+                        }
+                        if (listNote.Items[i].Text.Length > 500)
+                        {
+                            listNote.Items[i].Text = listNote.Items[i].Text.Substring(0, 500);
+                        }
+                    }
+                    break;
+
+                case ChecklistNote checklistNote:
+                    for (int i = 0; i < checklistNote.Items.Count; i++)
+                    {
+                        if (string.IsNullOrWhiteSpace(checklistNote.Items[i].ItemName))
+                        {
+                            throw new Exception($"Элемент чек-листа под номером {i + 1} не может быть пустым");
+                        }
+                        if (checklistNote.Items[i].ItemName.Length > 500)
+                        {
+                            checklistNote.Items[i].ItemName = checklistNote.Items[i].ItemName.Substring(0, 500);
+                        }
+                    }
+                    break;
+            }
+        }
+
         private void RefreshNotesDisplay()
         {
-            // Проверяем, что страница загружена
             if (LbNotes != null)
             {
                 UpdateNotesDisplay();
@@ -1308,7 +1569,7 @@ namespace diplomnarabotki
             NoteDialog.Visibility = Visibility.Collapsed;
         }
 
-        private void BtnDeleteNote_Click(object sender, RoutedEventArgs e)
+        private async void BtnDeleteNote_Click(object sender, RoutedEventArgs e)
         {
             if (LbNotes.SelectedItem is NoteDisplayItem selectedDisplayItem && _currentTravel != null)
             {
@@ -1321,8 +1582,8 @@ namespace diplomnarabotki
                     UpdatePinnedNotesDisplay();
                 }
 
+                await _dbService.SaveTravelAsync(_currentTravel);
                 LoadTravelToUI(_currentTravel);
-                SaveTravels();
                 RefreshNotesDisplay();
             }
             else
@@ -1334,7 +1595,6 @@ namespace diplomnarabotki
 
         private void LbNotes_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
-            // Выбор заметки
         }
 
         private void LbNotes_MouseDoubleClick(object sender, MouseButtonEventArgs e)
@@ -1385,7 +1645,6 @@ namespace diplomnarabotki
                         break;
                 }
 
-                // Загружаем настройки уведомлений
                 if (selectedNote.Notification != null && selectedNote.Notification.IsEnabled)
                 {
                     ChkEnableNotification.IsChecked = true;
@@ -1425,7 +1684,7 @@ namespace diplomnarabotki
             }
         }
 
-        private void LvPinnedNotes_MouseDoubleClick(object sender, MouseButtonEventArgs e)
+        private async void LvPinnedNotes_MouseDoubleClick(object sender, MouseButtonEventArgs e)
         {
             if (LvPinnedNotes.SelectedItem != null && _currentTravel != null)
             {
@@ -1441,7 +1700,7 @@ namespace diplomnarabotki
                         {
                             _currentTravel.PinnedNotes.Remove(note);
                             UpdatePinnedNotesDisplay();
-                            SaveTravels();
+                            await _dbService.SaveTravelAsync(_currentTravel);
 
                             MessageBox.Show("Заметка удалена из закрепленных!", "Успех",
                                 MessageBoxButton.OK, MessageBoxImage.Information);
@@ -1450,13 +1709,16 @@ namespace diplomnarabotki
                 }
             }
         }
-        private void BtnOpenMap_Click(object sender, RoutedEventArgs e)
-        {
-            // Сохраняем текущее путешествие перед переходом
-            UpdateCurrentTravel();
-            SaveTravels();
 
-            // Переходим на страницу карты
+        private async void BtnOpenMap_Click(object sender, RoutedEventArgs e)
+        {
+            if (_currentTravel != null)
+            {
+                _currentTravel.Name = TxtTravelName.Text;
+                _currentTravel.Route = TxtRoute.Text;
+                await _dbService.SaveTravelAsync(_currentTravel);
+            }
+
             NavigationService?.Navigate(new MapPage());
         }
     }
