@@ -15,7 +15,6 @@
     <Page.Resources>
         <BooleanToVisibilityConverter x:Key="BoolToVisibility"/>
 
-        <!-- Стиль для TextBox с подсказкой -->
         <Style x:Key="SearchTextBoxStyle" TargetType="TextBox">
             <Setter Property="Padding" Value="10,8"/>
             <Setter Property="FontSize" Value="12"/>
@@ -56,6 +55,7 @@
                         Click="BtnNewTravel_Click" Width="160" Height="35" Margin="5"
                         Background="#4CAF50" Foreground="White" BorderThickness="0"
                         Cursor="Hand" FontWeight="Bold"/>
+
                 <Button x:Name="BtnSaveTravel" Content="💾 Сохранить" 
                         Click="BtnSaveTravel_Click" Width="120" Height="35" Margin="5"
                         Background="#2196F3" Foreground="White" BorderThickness="0"
@@ -66,31 +66,17 @@
                         Background="#9C27B0" Foreground="White" BorderThickness="0"
                         Cursor="Hand" FontWeight="Bold"/>
 
-                <!-- Отладочная кнопка -->
-                <Button x:Name="BtnDebugRoute" Content="🐛 Проверить" 
-                        Click="BtnDebugRoute_Click" Width="100" Height="35" Margin="5"
-                        Background="#555" Foreground="White" BorderThickness="0"
-                        Cursor="Hand" FontWeight="Bold"/>
-                <Button x:Name="BtnForceSave" Content="💾 Принудительно" 
-        Click="BtnForceSave_Click" Width="120" Height="35" Margin="5"
-        Background="#FF5722" Foreground="White" BorderThickness="0"
-        Cursor="Hand" FontWeight="Bold"/>
-                <Button x:Name="BtnReloadTravels" Content="🔄 Перезагрузить" 
-        Click="BtnReloadTravels_Click" Width="120" Height="35" Margin="5"
-        Background="#17A2B8" Foreground="White" BorderThickness="0"
-        Cursor="Hand" FontWeight="Bold"/>
-
-                <Separator Width="30" Visibility="Collapsed"/>
+                <Separator Width="20" Visibility="Visible"/>
 
                 <TextBlock Text="Текущее путешествие:" VerticalAlignment="Center" 
-                           Margin="20,0,5,0" FontSize="12" Foreground="#666"/>
+                           Margin="10,0,5,0" FontSize="12" Foreground="#666"/>
                 <ComboBox x:Name="CmbTravels" Width="200" Height="35" Margin="5"
                           SelectionChanged="CmbTravels_SelectionChanged"
                           FontSize="12" Background="White"/>
             </StackPanel>
         </Border>
 
-        <!-- Левая панель - Основная информация и закрепленные заметки -->
+        <!-- Левая панель -->
         <Border Grid.Row="1" Grid.Column="0" Background="White" CornerRadius="5" 
                 BorderBrush="#E0E0E0" BorderThickness="1" Margin="5" Padding="15">
             <ScrollViewer VerticalScrollBarVisibility="Auto">
@@ -180,7 +166,8 @@
                                                                                TextWrapping="Wrap" 
                                                                                FontSize="12" 
                                                                                Foreground="#F57C00"
-                                                                               Margin="0,5,0,0"/>
+                                                                               Margin="0,5,0,0"
+                                                                               MaxHeight="100"/>
                                                                     <TextBlock Text="📅 Текстовая заметка" 
                                                                                FontSize="9" 
                                                                                Foreground="#FFB74D"
@@ -190,7 +177,7 @@
 
                                                             <DataTemplate DataType="{x:Type local:ListNote}">
                                                                 <StackPanel Margin="0,5,0,0">
-                                                                    <ItemsControl ItemsSource="{Binding Items}">
+                                                                    <ItemsControl ItemsSource="{Binding Items}" MaxHeight="150">
                                                                         <ItemsControl.ItemTemplate>
                                                                             <DataTemplate>
                                                                                 <StackPanel Orientation="Horizontal" Margin="0,2">
@@ -213,7 +200,7 @@
 
                                                             <DataTemplate DataType="{x:Type local:ChecklistNote}">
                                                                 <StackPanel Margin="0,5,0,0">
-                                                                    <ItemsControl ItemsSource="{Binding Items}">
+                                                                    <ItemsControl ItemsSource="{Binding Items}" MaxHeight="150">
                                                                         <ItemsControl.ItemTemplate>
                                                                             <DataTemplate>
                                                                                 <StackPanel Orientation="Horizontal" Margin="0,2">
@@ -279,13 +266,7 @@
                              Margin="0,0,0,10"
                              Style="{StaticResource SearchTextBoxStyle}"
                              TextChanged="TxtSearchNotes_TextChanged"
-                             ToolTip="Введите текст для поиска">
-                        <TextBox.Resources>
-                            <Style TargetType="Border">
-                                <Setter Property="CornerRadius" Value="5"/>
-                            </Style>
-                        </TextBox.Resources>
-                    </TextBox>
+                             ToolTip="Введите текст для поиска"/>
 
                     <Grid Margin="0,0,0,10">
                         <Grid.ColumnDefinitions>
@@ -418,7 +399,7 @@
         <!-- Диалог создания заметки -->
         <Grid x:Name="NoteDialog" Grid.RowSpan="2" Grid.ColumnSpan="2" 
               Background="#80000000" Visibility="Collapsed">
-            <Border Background="White" Width="550" Height="780" CornerRadius="10" 
+            <Border Background="White" Width="550" Height="650" CornerRadius="10" 
                     HorizontalAlignment="Center" VerticalAlignment="Center"
                     BorderBrush="#DDD" BorderThickness="1">
                 <ScrollViewer VerticalScrollBarVisibility="Auto">
@@ -443,6 +424,7 @@
 
                         <ScrollViewer MaxHeight="300" VerticalScrollBarVisibility="Auto">
                             <StackPanel x:Name="DynamicContentPanel">
+                                <!-- Текстовая заметка -->
                                 <StackPanel x:Name="TextNotePanel">
                                     <TextBlock Text="Содержание:" Margin="0,5,0,0" FontWeight="Bold" 
                                                Foreground="#555"/>
@@ -452,6 +434,7 @@
                                              FontSize="12" VerticalScrollBarVisibility="Auto"/>
                                 </StackPanel>
 
+                                <!-- Список -->
                                 <StackPanel x:Name="ListNotePanel" Visibility="Collapsed">
                                     <TextBlock Text="Элементы списка:" Margin="0,5,0,0" FontWeight="Bold" 
                                                Foreground="#555"/>
@@ -482,6 +465,7 @@
                                     </StackPanel>
                                 </StackPanel>
 
+                                <!-- Чек-лист -->
                                 <StackPanel x:Name="ChecklistNotePanel" Visibility="Collapsed">
                                     <TextBlock Text="Элементы чек-листа:" Margin="0,5,0,0" FontWeight="Bold" 
                                                Foreground="#555"/>
@@ -508,11 +492,11 @@
                                         </ListView.View>
                                     </ListView>
                                     <StackPanel Orientation="Horizontal">
-                                        <Button x:Name="BtnAddChecklistItemNote" Content="+ Добавить элемент" 
+                                        <Button x:Name="BtnAddChecklistItem" Content="+ Добавить элемент" 
                                                 Click="BtnAddChecklistItemNote_Click"
                                                 Width="120" Height="30" Margin="0,0,5,0"
                                                 Background="#4CAF50" Foreground="White" BorderThickness="0"/>
-                                        <Button x:Name="BtnRemoveChecklistItemNote" Content="✖ Удалить элемент" 
+                                        <Button x:Name="BtnRemoveChecklistItem" Content="✖ Удалить элемент" 
                                                 Click="BtnRemoveChecklistItemNote_Click"
                                                 Width="120" Height="30" Background="#F44336" 
                                                 Foreground="White" BorderThickness="0"/>

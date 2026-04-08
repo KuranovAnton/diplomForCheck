@@ -15,10 +15,9 @@ namespace diplomnarabotki.Data
 
         protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
         {
-            // Используем ваш SQL Server
             string connectionString = @"Server=DESKTOP-11PGGLI\SQLEXPRESS;Database=TravelJournalDb;Trusted_Connection=True;MultipleActiveResultSets=true;TrustServerCertificate=True";
             optionsBuilder.UseSqlServer(connectionString);
-            optionsBuilder.EnableSensitiveDataLogging(false); // Отключаем для production, можно оставить true для отладки
+            optionsBuilder.EnableSensitiveDataLogging(true); // Включаем для отладки
         }
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
@@ -81,15 +80,26 @@ namespace diplomnarabotki.Data
                 entity.HasOne(e => e.Travel).WithMany(e => e.RoutePoints).HasForeignKey(e => e.TravelId).OnDelete(DeleteBehavior.Cascade);
             });
 
-            // Настройка TravelString
+            // ИСПРАВЛЕНИЕ: Настройка TravelString с правильным каскадным удалением
             modelBuilder.Entity<TravelStringEntity>(entity =>
             {
                 entity.HasKey(e => e.Id);
                 entity.Property(e => e.Description).HasMaxLength(500);
                 entity.Property(e => e.Color).HasMaxLength(20);
                 entity.HasOne(e => e.Travel).WithMany(e => e.TravelStrings).HasForeignKey(e => e.TravelId).OnDelete(DeleteBehavior.Cascade);
-                entity.HasOne(e => e.FromPoint).WithMany().HasForeignKey(e => e.FromPointId).OnDelete(DeleteBehavior.Restrict);
-                entity.HasOne(e => e.ToPoint).WithMany().HasForeignKey(e => e.ToPointId).OnDelete(DeleteBehavior.Restrict);
+
+                // ИСПРАВЛЕНИЕ: Делаем связи необязательными и с каскадным удалением
+                entity.HasOne(e => e.FromPoint)
+                    .WithMany()
+                    .HasForeignKey(e => e.FromPointId)
+                    .OnDelete(DeleteBehavior.Cascade)
+                    .IsRequired(false);
+
+                entity.HasOne(e => e.ToPoint)
+                    .WithMany()
+                    .HasForeignKey(e => e.ToPointId)
+                    .OnDelete(DeleteBehavior.Cascade)
+                    .IsRequired(false);
             });
 
             // Настройка PinnedNote
@@ -97,7 +107,7 @@ namespace diplomnarabotki.Data
             {
                 entity.HasKey(e => e.Id);
                 entity.HasOne(e => e.Travel).WithMany(e => e.PinnedNotes).HasForeignKey(e => e.TravelId).OnDelete(DeleteBehavior.Cascade);
-                entity.HasOne(e => e.Note).WithMany().HasForeignKey(e => e.NoteId).OnDelete(DeleteBehavior.Restrict);
+                entity.HasOne(e => e.Note).WithMany().HasForeignKey(e => e.NoteId).OnDelete(DeleteBehavior.Cascade);
             });
         }
     }

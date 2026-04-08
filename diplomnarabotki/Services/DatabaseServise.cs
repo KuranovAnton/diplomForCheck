@@ -33,12 +33,6 @@ namespace diplomnarabotki.Services
                 .OrderBy(t => t.CreatedAt)
                 .ToListAsync();
 
-            System.Diagnostics.Debug.WriteLine("=== LoadAllTravelsAsync ===");
-            foreach (var entity in travelEntities)
-            {
-                System.Diagnostics.Debug.WriteLine($"Entity: Id={entity.Id}, Name={entity.Name}, Route={entity.Route}");
-            }
-
             foreach (var entity in travelEntities)
             {
                 travels.Add(ConvertToTravel(entity));
@@ -154,11 +148,6 @@ namespace diplomnarabotki.Services
 
         private Travel ConvertToTravel(TravelEntity entity)
         {
-            System.Diagnostics.Debug.WriteLine($"=== ConvertToTravel ===");
-            System.Diagnostics.Debug.WriteLine($"Entity Id: {entity.Id}");
-            System.Diagnostics.Debug.WriteLine($"Entity Name: '{entity.Name}'");
-            System.Diagnostics.Debug.WriteLine($"Entity Route: '{entity.Route}'");
-
             var travel = new Travel
             {
                 Id = entity.Id,
@@ -166,7 +155,6 @@ namespace diplomnarabotki.Services
                 Route = entity.Route ?? ""
             };
 
-            System.Diagnostics.Debug.WriteLine($"Created Travel Route: '{travel.Route}'");
             var notesDict = new Dictionary<int, NoteBase>();
 
             foreach (var noteEntity in entity.Notes.OrderBy(n => n.Id))
@@ -223,12 +211,12 @@ namespace diplomnarabotki.Services
                 }
             }
 
-            // ВАЖНО: Сохраняем Id точек при загрузке
+            // Загружаем точки маршрута
             foreach (var pointEntity in entity.RoutePoints.OrderBy(p => p.Order))
             {
                 var routePoint = new RoutePoint
                 {
-                    Id = pointEntity.Id,  // Сохраняем Id из БД
+                    Id = pointEntity.Id,
                     Latitude = pointEntity.Latitude,
                     Longitude = pointEntity.Longitude,
                     Title = pointEntity.Title,
@@ -245,17 +233,26 @@ namespace diplomnarabotki.Services
                 travel.RoutePoints.Add(routePoint);
             }
 
-            // Загрузка связей - здесь From и To - это Id точек из БД
+            // Загружаем связи (используем Order для связи, а не Id)
+            var pointsByOrder = travel.RoutePoints.ToDictionary(p => p.Order, p => p.Order);
+
             foreach (var stringEntity in entity.TravelStrings)
             {
-                travel.TravelStrings.Add(new TravelString
+                // Находим точки по их Id из БД и получаем их Order
+                var fromPoint = travel.RoutePoints.FirstOrDefault(p => p.Id == stringEntity.FromPointId);
+                var toPoint = travel.RoutePoints.FirstOrDefault(p => p.Id == stringEntity.ToPointId);
+
+                if (fromPoint != null && toPoint != null)
                 {
-                    From = stringEntity.FromPointId,
-                    To = stringEntity.ToPointId,
-                    Description = stringEntity.Description ?? "",
-                    Color = stringEntity.Color ?? "#ed8936",
-                    Width = stringEntity.Width > 0 ? stringEntity.Width : 2
-                });
+                    travel.TravelStrings.Add(new TravelString
+                    {
+                        From = fromPoint.Order,
+                        To = toPoint.Order,
+                        Description = stringEntity.Description ?? "",
+                        Color = stringEntity.Color ?? "#ed8936",
+                        Width = stringEntity.Width > 0 ? stringEntity.Width : 2
+                    });
+                }
             }
 
             return travel;
@@ -338,19 +335,6 @@ namespace diplomnarabotki.Services
                 });
             }
 
-            foreach (var travelString in travel.TravelStrings)
-            {
-                entity.TravelStrings.Add(new TravelStringEntity
-                {
-                    TravelId = entity.Id,
-                    FromPointId = travelString.From,
-                    ToPointId = travelString.To,
-                    Description = travelString.Description ?? "",
-                    Color = travelString.Color ?? "#ed8936",
-                    Width = travelString.Width > 0 ? travelString.Width : 2
-                });
-            }
-
             return entity;
         }
 
@@ -360,30 +344,40 @@ namespace diplomnarabotki.Services
             existing.Route = updated.Route;
             existing.UpdatedAt = DateTime.Now;
 
-            // 1. Удаляем старые закрепленные заметки (они зависят от Notes)
+            // ВАЖНО: Очищаем все связи перед обновлением
+            var oldStrings = existing.TravelStrings.ToList();
+            foreach (var oldString in oldStrings)
+            {
+                // Отвязываем точки перед удалением
+                oldString.FromPoint = null;
+                oldString.ToPoint = null;
+                _context.Entry(oldString).State = EntityState.Detached;
+            }
+            _context.TravelStrings.RemoveRange(oldStrings);
+
             var oldPinnedNotes = existing.PinnedNotes.ToList();
             _context.PinnedNotes.RemoveRange(oldPinnedNotes);
-            await _context.SaveChangesAsync();
-            existing.PinnedNotes.Clear();
 
-            // 2. Удаляем старые заметки
             var oldNotes = existing.Notes.ToList();
             _context.Notes.RemoveRange(oldNotes);
-            await _context.SaveChangesAsync();
-            existing.Notes.Clear();
 
-            // 3. Удаляем старые точки маршрута и связи
             var oldPoints = existing.RoutePoints.ToList();
+            foreach (var oldPoint in oldPoints)
+            {
+                // Очищаем связи
+                _context.Entry(oldPoint).State = EntityState.Detached;
+            }
             _context.RoutePoints.RemoveRange(oldPoints);
-            await _context.SaveChangesAsync();
+
+            // Очищаем коллекции
+            existing.TravelStrings.Clear();
+            existing.PinnedNotes.Clear();
+            existing.Notes.Clear();
             existing.RoutePoints.Clear();
 
-            var oldStrings = existing.TravelStrings.ToList();
-            _context.TravelStrings.RemoveRange(oldStrings);
             await _context.SaveChangesAsync();
-            existing.TravelStrings.Clear();
 
-            // 4. Создаем новые заметки и сразу сохраняем их, чтобы получить Id
+            // Создаем новые заметки
             var newNotes = new List<NoteEntity>();
             foreach (var note in updated.Notes)
             {
@@ -430,10 +424,10 @@ namespace diplomnarabotki.Services
                 newNotes.Add(noteEntity);
             }
 
-            // ВАЖНО: Сохраняем заметки, чтобы получить их Id
+            // Сохраняем заметки, чтобы получить их Id
             await _context.SaveChangesAsync();
 
-            // 5. Создаем новые закрепленные заметки (теперь NoteId существует)
+            // Создаем новые закрепленные заметки
             int pinnedOrder = 0;
             foreach (var pinnedNote in updated.PinnedNotes)
             {
@@ -451,11 +445,12 @@ namespace diplomnarabotki.Services
                 }
             }
 
-            // 6. Создаем новые точки маршрута
+            // Создаем новые точки маршрута
             int pointOrder = 0;
+            var pointsList = new List<RoutePointEntity>();
             foreach (var point in updated.RoutePoints)
             {
-                existing.RoutePoints.Add(new RoutePointEntity
+                var pointEntity = new RoutePointEntity
                 {
                     TravelId = existing.Id,
                     Latitude = point.Latitude,
@@ -470,21 +465,18 @@ namespace diplomnarabotki.Services
                     Status = point.Status,
                     PhotoUrl = point.PhotoUrl?.Length > 450 ? point.PhotoUrl.Substring(0, 450) : point.PhotoUrl ?? "",
                     VisitDate = point.VisitDate
-                });
+                };
+                existing.RoutePoints.Add(pointEntity);
+                pointsList.Add(pointEntity);
             }
 
             // Сохраняем точки, чтобы получить их Id
             await _context.SaveChangesAsync();
 
-            // 7. Создаем словарь для связи индексов с реальными Id
-            var pointsDict = new Dictionary<int, int>();
-            var pointsList = existing.RoutePoints.OrderBy(p => p.Order).ToList();
-            for (int i = 0; i < pointsList.Count; i++)
-            {
-                pointsDict[i] = pointsList[i].Id;
-            }
+            // Создаем словарь для связи Order -> Id
+            var pointsDict = pointsList.ToDictionary(p => p.Order, p => p.Id);
 
-            // 8. Создаем новые связи
+            // Создаем новые связи
             foreach (var travelString in updated.TravelStrings)
             {
                 if (pointsDict.ContainsKey(travelString.From) && pointsDict.ContainsKey(travelString.To))
