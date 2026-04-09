@@ -1,8 +1,8 @@
 {
   "version": 2,
-  "dgSpecHash": "EatrdmhqAFQ=",
+  "dgSpecHash": "pOEZGXrCnVQ=",
   "success": true,
-  "projectFilePath": "C:\\Users\\Msi\\source\\repos\\diplomForCheck\\diplomnarabotki\\diplomnarabotki.csproj",
+  "projectFilePath": "C:\\Users\\Msi\\source\\repos\\diplommvvm\\diplomnarabotki\\diplomnarabotki.csproj",
   "expectedPackageFiles": [
     "C:\\Users\\Msi\\.nuget\\packages\\azure.core\\1.47.1\\azure.core.1.47.1.nupkg.sha512",
     "C:\\Users\\Msi\\.nuget\\packages\\azure.identity\\1.14.2\\azure.identity.1.14.2.nupkg.sha512",
@@ -97,9 +97,9 @@
       "code": "NU1701",
       "level": "Warning",
       "message": "Пакет \"OpenTK 3.3.1\" был восстановлен с помощью \".NETFramework,Version=v4.6.1, .NETFramework,Version=v4.6.2, .NETFramework,Version=v4.7, .NETFramework,Version=v4.7.1, .NETFramework,Version=v4.7.2, .NETFramework,Version=v4.8, .NETFramework,Version=v4.8.1\", а не целевой платформы проекта \"net10.0-windows7.0\". Этот пакет может быть не полностью совместим с вашим проектом.",
-      "projectPath": "C:\\Users\\Msi\\source\\repos\\diplomForCheck\\diplomnarabotki\\diplomnarabotki.csproj",
+      "projectPath": "C:\\Users\\Msi\\source\\repos\\diplommvvm\\diplomnarabotki\\diplomnarabotki.csproj",
       "warningLevel": 1,
-      "filePath": "C:\\Users\\Msi\\source\\repos\\diplomForCheck\\diplomnarabotki\\diplomnarabotki.csproj",
+      "filePath": "C:\\Users\\Msi\\source\\repos\\diplommvvm\\diplomnarabotki\\diplomnarabotki.csproj",
       "libraryId": "OpenTK",
       "targetGraphs": [
         "net10.0-windows7.0"
@@ -109,9 +109,9 @@
       "code": "NU1701",
       "level": "Warning",
       "message": "Пакет \"OpenTK.GLWpfControl 3.3.0\" был восстановлен с помощью \".NETFramework,Version=v4.6.1, .NETFramework,Version=v4.6.2, .NETFramework,Version=v4.7, .NETFramework,Version=v4.7.1, .NETFramework,Version=v4.7.2, .NETFramework,Version=v4.8, .NETFramework,Version=v4.8.1\", а не целевой платформы проекта \"net10.0-windows7.0\". Этот пакет может быть не полностью совместим с вашим проектом.",
-      "projectPath": "C:\\Users\\Msi\\source\\repos\\diplomForCheck\\diplomnarabotki\\diplomnarabotki.csproj",
+      "projectPath": "C:\\Users\\Msi\\source\\repos\\diplommvvm\\diplomnarabotki\\diplomnarabotki.csproj",
       "warningLevel": 1,
-      "filePath": "C:\\Users\\Msi\\source\\repos\\diplomForCheck\\diplomnarabotki\\diplomnarabotki.csproj",
+      "filePath": "C:\\Users\\Msi\\source\\repos\\diplommvvm\\diplomnarabotki\\diplomnarabotki.csproj",
       "libraryId": "OpenTK.GLWpfControl",
       "targetGraphs": [
         "net10.0-windows7.0"
@@ -121,9 +121,9 @@
       "code": "NU1701",
       "level": "Warning",
       "message": "Пакет \"SkiaSharp.Views.WPF 3.119.1\" был восстановлен с помощью \".NETFramework,Version=v4.6.1, .NETFramework,Version=v4.6.2, .NETFramework,Version=v4.7, .NETFramework,Version=v4.7.1, .NETFramework,Version=v4.7.2, .NETFramework,Version=v4.8, .NETFramework,Version=v4.8.1\", а не целевой платформы проекта \"net10.0-windows7.0\". Этот пакет может быть не полностью совместим с вашим проектом.",
-      "projectPath": "C:\\Users\\Msi\\source\\repos\\diplomForCheck\\diplomnarabotki\\diplomnarabotki.csproj",
+      "projectPath": "C:\\Users\\Msi\\source\\repos\\diplommvvm\\diplomnarabotki\\diplomnarabotki.csproj",
       "warningLevel": 1,
-      "filePath": "C:\\Users\\Msi\\source\\repos\\diplomForCheck\\diplomnarabotki\\diplomnarabotki.csproj",
+      "filePath": "C:\\Users\\Msi\\source\\repos\\diplommvvm\\diplomnarabotki\\diplomnarabotki.csproj",
       "libraryId": "SkiaSharp.Views.WPF",
       "targetGraphs": [
         "net10.0-windows7.0"

@@ -2,6 +2,7 @@
 using System.Collections.ObjectModel;
 using System.IO;
 using System.Threading.Tasks;
+using diplomnarabotki.ViewModels;
 
 namespace diplomnarabotki.Services
 {
@@ -107,7 +108,7 @@ namespace diplomnarabotki.Services
         }
 
         // Очистка неиспользуемых фото
-        public void CleanupUnusedPhotos(ObservableCollection<Travel> travels)
+        public void CleanupUnusedPhotos(ObservableCollection<TravelViewModel> travels)
         {
             if (!Directory.Exists(_photosDirectory))
                 return;

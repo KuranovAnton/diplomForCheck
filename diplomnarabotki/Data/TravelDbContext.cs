@@ -88,18 +88,18 @@ namespace diplomnarabotki.Data
                 entity.Property(e => e.Color).HasMaxLength(20);
                 entity.HasOne(e => e.Travel).WithMany(e => e.TravelStrings).HasForeignKey(e => e.TravelId).OnDelete(DeleteBehavior.Cascade);
 
-                // ИСПРАВЛЕНИЕ: Делаем связи необязательными и с каскадным удалением
+                // ИСПРАВЛЕНИЕ: Делаем связи с каскадным удалением
                 entity.HasOne(e => e.FromPoint)
                     .WithMany()
                     .HasForeignKey(e => e.FromPointId)
                     .OnDelete(DeleteBehavior.Cascade)
-                    .IsRequired(false);
+                    .IsRequired(true);  // ИСПРАВЛЕНО: Делаем обязательным
 
                 entity.HasOne(e => e.ToPoint)
                     .WithMany()
                     .HasForeignKey(e => e.ToPointId)
                     .OnDelete(DeleteBehavior.Cascade)
-                    .IsRequired(false);
+                    .IsRequired(true);  // ИСПРАВЛЕНО: Делаем обязательным
             });
 
             // Настройка PinnedNote

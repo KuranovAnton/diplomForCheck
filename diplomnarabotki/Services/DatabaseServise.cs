@@ -1,4 +1,8 @@
 ﻿using diplomnarabotki.Data;
+using diplomnarabotki.Models;
+using diplomnarabotki.Models.Enums;
+using diplomnarabotki.ViewModels;
+using diplomnarabotki.ViewModels.NoteViewModels;
 using Microsoft.EntityFrameworkCore;
 using System.Collections.ObjectModel;
 using System.Linq;
@@ -17,9 +21,9 @@ namespace diplomnarabotki.Services
             _context.Database.EnsureCreated();
         }
 
-        public async Task<ObservableCollection<Travel>> LoadAllTravelsAsync()
+        public async Task<ObservableCollection<TravelViewModel>> LoadAllTravelsAsync()
         {
-            var travels = new ObservableCollection<Travel>();
+            var travels = new ObservableCollection<TravelViewModel>();
 
             var travelEntities = await _context.Travels
                 .Include(t => t.Notes)
@@ -35,13 +39,13 @@ namespace diplomnarabotki.Services
 
             foreach (var entity in travelEntities)
             {
-                travels.Add(ConvertToTravel(entity));
+                travels.Add(ConvertToTravelViewModel(entity));
             }
 
             return travels;
         }
 
-        public async Task SaveTravelAsync(Travel travel)
+        public async Task SaveTravelAsync(TravelViewModel travel)
         {
             try
             {
@@ -65,6 +69,20 @@ namespace diplomnarabotki.Services
                     var newEntity = ConvertToEntity(travel);
                     _context.Travels.Add(newEntity);
                     await _context.SaveChangesAsync();
+
+                    // Обновляем ID у ViewModel после сохранения
+                    travel.Id = newEntity.Id;
+                    foreach (var point in travel.RoutePoints)
+                    {
+                        var savedPoint = newEntity.RoutePoints.FirstOrDefault(p =>
+                            p.Latitude == point.Latitude &&
+                            p.Longitude == point.Longitude &&
+                            p.Order == point.Order);
+                        if (savedPoint != null)
+                        {
+                            point.Id = savedPoint.Id;
+                        }
+                    }
                 }
             }
             catch (DbUpdateException ex)
@@ -90,7 +108,7 @@ namespace diplomnarabotki.Services
             {
                 var json = await File.ReadAllTextAsync(jsonFilePath);
                 var options = new JsonSerializerOptions { WriteIndented = true };
-                var oldTravels = JsonSerializer.Deserialize<ObservableCollection<Travel>>(json, options);
+                var oldTravels = JsonSerializer.Deserialize<ObservableCollection<TravelViewModel>>(json, options);
 
                 if (oldTravels != null)
                 {
@@ -103,7 +121,7 @@ namespace diplomnarabotki.Services
             }
         }
 
-        private string? SerializeNotification(Notification? notification)
+        private string? SerializeNotification(NotificationViewModel? notification)
         {
             if (notification == null || !notification.IsEnabled)
                 return null;
@@ -120,7 +138,7 @@ namespace diplomnarabotki.Services
             return JsonSerializer.Serialize(data);
         }
 
-        private Notification? DeserializeNotification(string? json)
+        private NotificationViewModel? DeserializeNotification(string? json)
         {
             if (string.IsNullOrEmpty(json))
                 return null;
@@ -131,7 +149,7 @@ namespace diplomnarabotki.Services
                 if (data == null || !data.IsEnabled)
                     return null;
 
-                return new Notification
+                return new NotificationViewModel
                 {
                     IsEnabled = data.IsEnabled,
                     ReminderTime = data.ReminderTime,
@@ -146,46 +164,46 @@ namespace diplomnarabotki.Services
             }
         }
 
-        private Travel ConvertToTravel(TravelEntity entity)
+        private TravelViewModel ConvertToTravelViewModel(TravelEntity entity)
         {
-            var travel = new Travel
+            var travel = new TravelViewModel
             {
                 Id = entity.Id,
                 Name = entity.Name ?? "",
                 Route = entity.Route ?? ""
             };
 
-            var notesDict = new Dictionary<int, NoteBase>();
+            var notesDict = new Dictionary<int, NoteBaseViewModel>();
 
             foreach (var noteEntity in entity.Notes.OrderBy(n => n.Id))
             {
-                NoteBase note = noteEntity.NoteType switch
+                NoteBaseViewModel note = noteEntity.NoteType switch
                 {
-                    "Text" => new TextNote
+                    "Text" => new TextNoteViewModel
                     {
                         Title = noteEntity.Title,
                         Content = noteEntity.Content ?? "",
                         CreatedDate = noteEntity.CreatedDate
                     },
-                    "List" => new ListNote
+                    "List" => new ListNoteViewModel
                     {
                         Title = noteEntity.Title,
                         CreatedDate = noteEntity.CreatedDate,
-                        Items = new ObservableCollection<ListItem>(
-                            noteEntity.ListItems.OrderBy(i => i.Order).Select(i => new ListItem { Text = i.Text }))
+                        Items = new ObservableCollection<ListItemModel>(
+                            noteEntity.ListItems.OrderBy(i => i.Order).Select(i => new ListItemModel { Text = i.Text }))
                     },
-                    "Checklist" => new ChecklistNote
+                    "Checklist" => new ChecklistNoteViewModel
                     {
                         Title = noteEntity.Title,
                         CreatedDate = noteEntity.CreatedDate,
-                        Items = new ObservableCollection<ChecklistItem>(
-                            noteEntity.ChecklistItems.OrderBy(i => i.Order).Select(i => new ChecklistItem
+                        Items = new ObservableCollection<ChecklistItemModel>(
+                            noteEntity.ChecklistItems.OrderBy(i => i.Order).Select(i => new ChecklistItemModel
                             {
                                 ItemName = i.ItemName,
                                 IsChecked = i.IsChecked
                             }))
                     },
-                    _ => new TextNote
+                    _ => new TextNoteViewModel
                     {
                         Title = noteEntity.Title,
                         Content = noteEntity.Content ?? "",
@@ -214,7 +232,7 @@ namespace diplomnarabotki.Services
             // Загружаем точки маршрута
             foreach (var pointEntity in entity.RoutePoints.OrderBy(p => p.Order))
             {
-                var routePoint = new RoutePoint
+                var routePoint = new RoutePointViewModel
                 {
                     Id = pointEntity.Id,
                     Latitude = pointEntity.Latitude,
@@ -233,32 +251,24 @@ namespace diplomnarabotki.Services
                 travel.RoutePoints.Add(routePoint);
             }
 
-            // Загружаем связи (используем Order для связи, а не Id)
-            var pointsByOrder = travel.RoutePoints.ToDictionary(p => p.Order, p => p.Order);
-
+            // Загружаем связи используя ID точек
             foreach (var stringEntity in entity.TravelStrings)
             {
-                // Находим точки по их Id из БД и получаем их Order
-                var fromPoint = travel.RoutePoints.FirstOrDefault(p => p.Id == stringEntity.FromPointId);
-                var toPoint = travel.RoutePoints.FirstOrDefault(p => p.Id == stringEntity.ToPointId);
-
-                if (fromPoint != null && toPoint != null)
+                travel.TravelStrings.Add(new TravelStringViewModel
                 {
-                    travel.TravelStrings.Add(new TravelString
-                    {
-                        From = fromPoint.Order,
-                        To = toPoint.Order,
-                        Description = stringEntity.Description ?? "",
-                        Color = stringEntity.Color ?? "#ed8936",
-                        Width = stringEntity.Width > 0 ? stringEntity.Width : 2
-                    });
-                }
+                    Id = stringEntity.Id,
+                    From = stringEntity.FromPointId,
+                    To = stringEntity.ToPointId,
+                    Description = stringEntity.Description ?? "",
+                    Color = stringEntity.Color ?? "#ed8936",
+                    Width = stringEntity.Width > 0 ? stringEntity.Width : 2
+                });
             }
 
             return travel;
         }
 
-        private TravelEntity ConvertToEntity(Travel travel)
+        private TravelEntity ConvertToEntity(TravelViewModel travel)
         {
             var entity = new TravelEntity
             {
@@ -280,11 +290,11 @@ namespace diplomnarabotki.Services
                     NotificationDataJson = SerializeNotification(note.Notification)
                 };
 
-                if (note is TextNote textNote)
+                if (note is TextNoteViewModel textNote)
                 {
                     noteEntity.Content = textNote.Content;
                 }
-                else if (note is ListNote listNote)
+                else if (note is ListNoteViewModel listNote)
                 {
                     int itemOrder = 0;
                     foreach (var item in listNote.Items)
@@ -296,7 +306,7 @@ namespace diplomnarabotki.Services
                         });
                     }
                 }
-                else if (note is ChecklistNote checklistNote)
+                else if (note is ChecklistNoteViewModel checklistNote)
                 {
                     int itemOrder = 0;
                     foreach (var item in checklistNote.Items)
@@ -338,46 +348,30 @@ namespace diplomnarabotki.Services
             return entity;
         }
 
-        private async Task UpdateTravelEntityAsync(TravelEntity existing, Travel updated)
+        private async Task UpdateTravelEntityAsync(TravelEntity existing, TravelViewModel updated)
         {
             existing.Name = updated.Name;
             existing.Route = updated.Route;
             existing.UpdatedAt = DateTime.Now;
 
-            // ВАЖНО: Очищаем все связи перед обновлением
+            // Очищаем старые связи между точками
             var oldStrings = existing.TravelStrings.ToList();
-            foreach (var oldString in oldStrings)
-            {
-                // Отвязываем точки перед удалением
-                oldString.FromPoint = null;
-                oldString.ToPoint = null;
-                _context.Entry(oldString).State = EntityState.Detached;
-            }
             _context.TravelStrings.RemoveRange(oldStrings);
 
+            // Очищаем старые точки
+            var oldPoints = existing.RoutePoints.ToList();
+            _context.RoutePoints.RemoveRange(oldPoints);
+
+            // Очищаем старые заметки и закрепления
             var oldPinnedNotes = existing.PinnedNotes.ToList();
             _context.PinnedNotes.RemoveRange(oldPinnedNotes);
 
             var oldNotes = existing.Notes.ToList();
             _context.Notes.RemoveRange(oldNotes);
 
-            var oldPoints = existing.RoutePoints.ToList();
-            foreach (var oldPoint in oldPoints)
-            {
-                // Очищаем связи
-                _context.Entry(oldPoint).State = EntityState.Detached;
-            }
-            _context.RoutePoints.RemoveRange(oldPoints);
-
-            // Очищаем коллекции
-            existing.TravelStrings.Clear();
-            existing.PinnedNotes.Clear();
-            existing.Notes.Clear();
-            existing.RoutePoints.Clear();
-
             await _context.SaveChangesAsync();
 
-            // Создаем новые заметки
+            // Создаём новые заметки
             var newNotes = new List<NoteEntity>();
             foreach (var note in updated.Notes)
             {
@@ -390,11 +384,11 @@ namespace diplomnarabotki.Services
                     NotificationDataJson = SerializeNotification(note.Notification)
                 };
 
-                if (note is TextNote textNote)
+                if (note is TextNoteViewModel textNote)
                 {
                     noteEntity.Content = textNote.Content;
                 }
-                else if (note is ListNote listNote)
+                else if (note is ListNoteViewModel listNote)
                 {
                     int itemOrder = 0;
                     foreach (var item in listNote.Items)
@@ -406,7 +400,7 @@ namespace diplomnarabotki.Services
                         });
                     }
                 }
-                else if (note is ChecklistNote checklistNote)
+                else if (note is ChecklistNoteViewModel checklistNote)
                 {
                     int itemOrder = 0;
                     foreach (var item in checklistNote.Items)
@@ -424,10 +418,10 @@ namespace diplomnarabotki.Services
                 newNotes.Add(noteEntity);
             }
 
-            // Сохраняем заметки, чтобы получить их Id
+            // Сохраняем заметки
             await _context.SaveChangesAsync();
 
-            // Создаем новые закрепленные заметки
+            // Создаём новые закрепленные заметки
             int pinnedOrder = 0;
             foreach (var pinnedNote in updated.PinnedNotes)
             {
@@ -445,9 +439,10 @@ namespace diplomnarabotki.Services
                 }
             }
 
-            // Создаем новые точки маршрута
+            // Создаём новые точки маршрута и запоминаем старые ID
+            var oldToNewIdMap = new Dictionary<int, int>();
             int pointOrder = 0;
-            var pointsList = new List<RoutePointEntity>();
+
             foreach (var point in updated.RoutePoints)
             {
                 var pointEntity = new RoutePointEntity
@@ -467,34 +462,68 @@ namespace diplomnarabotki.Services
                     VisitDate = point.VisitDate
                 };
                 existing.RoutePoints.Add(pointEntity);
-                pointsList.Add(pointEntity);
             }
 
-            // Сохраняем точки, чтобы получить их Id
+            // Сохраняем точки, чтобы получить новые ID
             await _context.SaveChangesAsync();
 
-            // Создаем словарь для связи Order -> Id
-            var pointsDict = pointsList.ToDictionary(p => p.Order, p => p.Id);
+            // Заполняем карту старых ID на новые
+            var newPoints = existing.RoutePoints.OrderBy(p => p.Order).ToList();
+            var oldPointsList = updated.RoutePoints.OrderBy(p => p.Order).ToList();
 
-            // Создаем новые связи
+            for (int i = 0; i < newPoints.Count && i < oldPointsList.Count; i++)
+            {
+                oldToNewIdMap[oldPointsList[i].Id] = newPoints[i].Id;
+                // Обновляем ID в ViewModel
+                oldPointsList[i].Id = newPoints[i].Id;
+            }
+
+            System.Diagnostics.Debug.WriteLine($"=== Saving strings to DB ===");
+            System.Diagnostics.Debug.WriteLine($"Old to New ID map: {string.Join(", ", oldToNewIdMap.Select(kvp => $"{kvp.Key}->{kvp.Value}"))}");
+
+            // Создаём новые связи используя новые ID точек
             foreach (var travelString in updated.TravelStrings)
             {
-                if (pointsDict.ContainsKey(travelString.From) && pointsDict.ContainsKey(travelString.To))
+                System.Diagnostics.Debug.WriteLine($"Processing string: From={travelString.From}, To={travelString.To}");
+
+                // Конвертируем старые ID в новые
+                int newFromId = oldToNewIdMap.ContainsKey(travelString.From) ? oldToNewIdMap[travelString.From] : travelString.From;
+                int newToId = oldToNewIdMap.ContainsKey(travelString.To) ? oldToNewIdMap[travelString.To] : travelString.To;
+
+                System.Diagnostics.Debug.WriteLine($"Converted to new IDs: From={newFromId}, To={newToId}");
+
+                // Проверяем существование точек с новыми ID
+                var fromPointExists = existing.RoutePoints.Any(p => p.Id == newFromId);
+                var toPointExists = existing.RoutePoints.Any(p => p.Id == newToId);
+
+                if (fromPointExists && toPointExists)
                 {
-                    existing.TravelStrings.Add(new TravelStringEntity
+                    var stringEntity = new TravelStringEntity
                     {
                         TravelId = existing.Id,
-                        FromPointId = pointsDict[travelString.From],
-                        ToPointId = pointsDict[travelString.To],
+                        FromPointId = newFromId,
+                        ToPointId = newToId,
                         Description = travelString.Description ?? "",
                         Color = travelString.Color ?? "#ed8936",
                         Width = travelString.Width > 0 ? travelString.Width : 2
-                    });
+                    };
+
+                    existing.TravelStrings.Add(stringEntity);
+                    System.Diagnostics.Debug.WriteLine($"Saved string with IDs: {newFromId} -> {newToId}");
+
+                    // Обновляем ID в ViewModel
+                    travelString.From = newFromId;
+                    travelString.To = newToId;
+                }
+                else
+                {
+                    System.Diagnostics.Debug.WriteLine($"ERROR: Points not found. FromPointExists={fromPointExists}, ToPointExists={toPointExists}");
                 }
             }
 
             // Финальное сохранение
             await _context.SaveChangesAsync();
+            System.Diagnostics.Debug.WriteLine($"Total strings saved: {existing.TravelStrings.Count}");
         }
     }
 }

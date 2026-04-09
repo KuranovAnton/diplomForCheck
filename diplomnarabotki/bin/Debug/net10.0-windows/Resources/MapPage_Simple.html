@@ -894,25 +894,36 @@
             });
         }
 
+        // ЗАМЕНИТЕ ЭТУ ФУНКЦИЮ В ВАШЕМ HTML-ФАЙЛЕ
         function createCurvedLine(sLat, sLng, eLat, eLng, color, weight) {
             try {
-                var midLat = (sLat + eLat) / 2;
-                var midLng = (sLng + eLng) / 2;
-                var dx = eLat - sLat;
-                var dy = eLng - sLng;
-                var dist = Math.sqrt(dx * dx + dy * dy);
-                var bend = dist * 0.3;
-                var perpX = -dy / dist;
-                var perpY = dx / dist;
-                var cLat = midLat + perpX * bend;
-                var cLng = midLng + perpY * bend;
+                // Переводим координаты в пиксели для точного контроля изгиба
+                var p1 = map.latLngToLayerPoint([sLat, sLng]);
+                var p2 = map.latLngToLayerPoint([eLat, eLng]);
+
+                var midX = (p1.x + p2.x) / 2;
+                var midY = (p1.y + p2.y) / 2;
+
+                var dx = p2.x - p1.x;
+                var dy = p2.y - p1.y;
+                var distance = Math.sqrt(dx * dx + dy * dy);
+
+                // Провис: 12% от расстояния, но не менее 25px и не более 80px
+                var sag = Math.min(Math.max(distance * 0.12, 25), 80);
+
+                // КЛЮЧЕВОЙ МОМЕНТ: ВСЕГДА ВНИЗ (увеличение Y)
+                var controlY = midY + sag;
+
+                // Строим точки кривой
                 var points = [];
-                for (var i = 0; i <= 20; i++) {
-                    var t = i / 20;
-                    var lat = Math.pow(1 - t, 2) * sLat + 2 * (1 - t) * t * cLat + Math.pow(t, 2) * eLat;
-                    var lng = Math.pow(1 - t, 2) * sLng + 2 * (1 - t) * t * cLng + Math.pow(t, 2) * eLng;
-                    points.push([lat, lng]);
+                for (var t = 0; t <= 1; t += 0.04) {
+                    var mt = 1 - t;
+                    var x = mt * mt * p1.x + 2 * mt * t * midX + t * t * p2.x;
+                    var y = mt * mt * p1.y + 2 * mt * t * controlY + t * t * p2.y;
+                    var latLng = map.layerPointToLatLng({ x: x, y: y });
+                    points.push([latLng.lat, latLng.lng]);
                 }
+
                 return L.polyline(points, { color: color, weight: weight, opacity: 0.8 });
             } catch (e) {
                 console.error('Error creating curved line:', e);
