@@ -190,6 +190,9 @@ namespace diplomnarabotki.Views
                 var simplePoints = new List<object>();
                 foreach (var point in _currentTravel.RoutePoints)
                 {
+                    // Для отображения на карте используем PhotoUrl (base64) или пустую строку
+                    string displayPhoto = point.PhotoUrl ?? "";
+
                     simplePoints.Add(new
                     {
                         Latitude = point.Latitude,
@@ -200,12 +203,12 @@ namespace diplomnarabotki.Views
                         IconColor = point.IconColor ?? "#e2e8f0",
                         IconSize = point.IconSize > 0 ? point.IconSize : 36,
                         Status = point.Status ?? "planned",
-                        PhotoUrl = point.PhotoUrl ?? "",
+                        PhotoUrl = displayPhoto,
                         VisitDate = point.VisitDate ?? ""
                     });
                 }
 
-                // ИСПРАВЛЕНО: Создаём словарь ID -> Index для конвертации ID в индексы для JavaScript
+                // Создаём словарь ID -> Index для конвертации ID в индексы для JavaScript
                 var idToIndex = new Dictionary<int, int>();
                 for (int i = 0; i < _currentTravel.RoutePoints.Count; i++)
                 {
@@ -220,7 +223,6 @@ namespace diplomnarabotki.Views
                     {
                         System.Diagnostics.Debug.WriteLine($"Processing string: From={s.From}, To={s.To}");
 
-                        // ИСПРАВЛЕНО: Используем From и To как ID точек, конвертируем в индексы
                         if (idToIndex.ContainsKey(s.From) && idToIndex.ContainsKey(s.To))
                         {
                             stringList.Add(new
@@ -284,19 +286,7 @@ namespace diplomnarabotki.Views
 
             try
             {
-                object result = null;
-                try
-                {
-                    result = WebBrowserMap.InvokeScript("exportPoints");
-                }
-                catch (Exception jsEx)
-                {
-                    System.Diagnostics.Debug.WriteLine($"JS Error: {jsEx.Message}");
-                    MessageBox.Show("Ошибка при экспорте точек с карты. Попробуйте обновить страницу.",
-                        "Ошибка", MessageBoxButton.OK, MessageBoxImage.Warning);
-                    return;
-                }
-
+                object result = WebBrowserMap.InvokeScript("exportPoints");
                 var pointsJson = result?.ToString();
 
                 if (string.IsNullOrEmpty(pointsJson))
@@ -306,98 +296,92 @@ namespace diplomnarabotki.Views
                     return;
                 }
 
-                System.Diagnostics.Debug.WriteLine($"Raw JSON from JS: {pointsJson}");
-
-                try
+                var options = new JsonSerializerOptions
                 {
-                    var options = new JsonSerializerOptions
-                    {
-                        PropertyNameCaseInsensitive = true
-                    };
+                    PropertyNameCaseInsensitive = true
+                };
 
-                    var wrapper = JsonSerializer.Deserialize<PointsWrapper>(pointsJson, options);
+                var wrapper = JsonSerializer.Deserialize<PointsWrapper>(pointsJson, options);
 
-                    System.Diagnostics.Debug.WriteLine($"Points from JS: {wrapper?.Points?.Count ?? 0}");
-                    System.Diagnostics.Debug.WriteLine($"Strings from JS: {wrapper?.Strings?.Count ?? 0}");
-
-                    // Сохраняем старые ID точек
-                    var oldPointIds = _currentTravel.RoutePoints.Select(p => p.Id).ToList();
-
-                    if (wrapper?.Points != null)
-                    {
-                        foreach (var point in wrapper.Points)
-                        {
-                            if (!string.IsNullOrEmpty(point.PhotoUrl) && point.PhotoUrl.StartsWith("data:image"))
-                            {
-                                var photoPath = await _photoService.SavePhotoAsync(
-                                    point.PhotoUrl,
-                                    _currentTravel.Id.ToString(),
-                                    point.Order.ToString()
-                                );
-                                point.PhotoUrl = photoPath;
-                            }
-                        }
-
-                        // Сохраняем старые ID для точек, которые уже были в коллекции
-                        for (int i = 0; i < wrapper.Points.Count && i < oldPointIds.Count; i++)
-                        {
-                            wrapper.Points[i].Id = oldPointIds[i];
-                        }
-
-                        _currentTravel.RoutePoints = wrapper.Points;
-                        System.Diagnostics.Debug.WriteLine($"Saved {_currentTravel.RoutePoints.Count} points");
-                    }
-
-                    if (wrapper?.Strings != null && wrapper.Strings.Count > 0)
-                    {
-                        _currentTravel.TravelStrings = new ObservableCollection<TravelStringViewModel>();
-
-                        // Создаём словарь Index -> ID для конвертации индексов из JS в ID точек
-                        var indexToId = new Dictionary<int, int>();
-                        for (int i = 0; i < _currentTravel.RoutePoints.Count; i++)
-                        {
-                            indexToId[i] = _currentTravel.RoutePoints[i].Id;
-                            System.Diagnostics.Debug.WriteLine($"Mapping: Index={i} -> Point Id={_currentTravel.RoutePoints[i].Id}");
-                        }
-
-                        foreach (var travelString in wrapper.Strings)
-                        {
-                            if (indexToId.ContainsKey(travelString.From) && indexToId.ContainsKey(travelString.To))
-                            {
-                                // Сохраняем ID точек
-                                _currentTravel.TravelStrings.Add(new TravelStringViewModel
-                                {
-                                    From = indexToId[travelString.From],
-                                    To = indexToId[travelString.To],
-                                    Description = travelString.Description ?? "",
-                                    Color = travelString.Color ?? "#ed8936",
-                                    Width = travelString.Width > 0 ? travelString.Width : 2
-                                });
-                                System.Diagnostics.Debug.WriteLine($"Added string: Index {travelString.From}->{travelString.To} converted to ID {indexToId[travelString.From]}->{indexToId[travelString.To]}");
-                            }
-                            else
-                            {
-                                System.Diagnostics.Debug.WriteLine($"Warning: Cannot save string from index {travelString.From} to {travelString.To}");
-                            }
-                        }
-                        System.Diagnostics.Debug.WriteLine($"Created {_currentTravel.TravelStrings.Count} strings in ViewModel");
-                    }
-                    else
-                    {
-                        _currentTravel.TravelStrings = new ObservableCollection<TravelStringViewModel>();
-                    }
-
-                    await _dbService.SaveTravelAsync(_currentTravel);
-
-                    MessageBox.Show($"Сохранено {_currentTravel.RoutePoints.Count} точек и {_currentTravel.TravelStrings.Count} связей!",
-                        "Успех", MessageBoxButton.OK, MessageBoxImage.Information);
-                }
-                catch (JsonException jsonEx)
+                if (wrapper?.Points != null)
                 {
-                    System.Diagnostics.Debug.WriteLine($"JSON Error: {jsonEx.Message}");
-                    MessageBox.Show($"Ошибка разбора данных: {jsonEx.Message}",
-                        "Ошибка", MessageBoxButton.OK, MessageBoxImage.Error);
+                    // Сохраняем фото и обновляем пути
+                    for (int i = 0; i < wrapper.Points.Count; i++)
+                    {
+                        var point = wrapper.Points[i];
+
+                        // Проверяем, есть ли новое фото в base64
+                        if (!string.IsNullOrEmpty(point.PhotoUrl) && point.PhotoUrl.StartsWith("data:image"))
+                        {
+                            // Удаляем старое фото, если оно было
+                            var oldPoint = _currentTravel.RoutePoints.FirstOrDefault(p => p.Id == point.Id);
+                            if (oldPoint != null && !string.IsNullOrEmpty(oldPoint.StoredPhotoPath) && oldPoint.StoredPhotoPath.StartsWith("Photos/"))
+                            {
+                                _photoService.DeletePhoto(oldPoint.StoredPhotoPath);
+                            }
+
+                            // Сохраняем новое фото
+                            var photoPath = await _photoService.SavePhotoAsync(
+                                point.PhotoUrl,
+                                _currentTravel.Id.ToString(),
+                                i.ToString()
+                            );
+
+                            // Сохраняем путь в StoredPhotoPath, а PhotoUrl оставляем для отображения
+                            point.StoredPhotoPath = photoPath;
+                            point.PhotoUrl = ""; // Очищаем base64, т.к. он больше не нужен
+                        }
+                        else if (string.IsNullOrEmpty(point.PhotoUrl) && !string.IsNullOrEmpty(point.StoredPhotoPath))
+                        {
+                            // Если фото удалено, удаляем файл
+                            var oldPoint = _currentTravel.RoutePoints.FirstOrDefault(p => p.Id == point.Id);
+                            if (oldPoint != null && !string.IsNullOrEmpty(oldPoint.StoredPhotoPath) && oldPoint.StoredPhotoPath.StartsWith("Photos/"))
+                            {
+                                _photoService.DeletePhoto(oldPoint.StoredPhotoPath);
+                            }
+                            point.StoredPhotoPath = "";
+                        }
+                        else if (!string.IsNullOrEmpty(point.StoredPhotoPath))
+                        {
+                            // Фото не менялось, сохраняем существующий путь
+                            point.PhotoUrl = ""; // Очищаем base64, если он был
+                        }
+                    }
+
+                    // Обновляем точки
+                    _currentTravel.RoutePoints = wrapper.Points;
                 }
+
+                if (wrapper?.Strings != null)
+                {
+                    _currentTravel.TravelStrings = new ObservableCollection<TravelStringViewModel>();
+
+                    var indexToId = new Dictionary<int, int>();
+                    for (int i = 0; i < _currentTravel.RoutePoints.Count; i++)
+                    {
+                        indexToId[i] = _currentTravel.RoutePoints[i].Id;
+                    }
+
+                    foreach (var travelString in wrapper.Strings)
+                    {
+                        if (indexToId.ContainsKey(travelString.From) && indexToId.ContainsKey(travelString.To))
+                        {
+                            _currentTravel.TravelStrings.Add(new TravelStringViewModel
+                            {
+                                From = indexToId[travelString.From],
+                                To = indexToId[travelString.To],
+                                Description = travelString.Description ?? "",
+                                Color = travelString.Color ?? "#ed8936",
+                                Width = travelString.Width > 0 ? travelString.Width : 2
+                            });
+                        }
+                    }
+                }
+
+                await _dbService.SaveTravelAsync(_currentTravel);
+
+                MessageBox.Show($"Сохранено {_currentTravel.RoutePoints.Count} точек и {_currentTravel.TravelStrings.Count} связей!",
+                    "Успех", MessageBoxButton.OK, MessageBoxImage.Information);
             }
             catch (Exception ex)
             {
@@ -468,13 +452,52 @@ namespace diplomnarabotki.Views
             }
         }
 
+        private void BtnBuildRoute_Click(object sender, RoutedEventArgs e)
+        {
+            if (!_isMapLoaded)
+            {
+                MessageBox.Show("Карта еще не загружена, подождите...", "Информация",
+                    MessageBoxButton.OK, MessageBoxImage.Information);
+                return;
+            }
+
+            if (_currentTravel?.RoutePoints == null || _currentTravel.RoutePoints.Count < 2)
+            {
+                MessageBox.Show("Для построения маршрута нужно минимум 2 точки!",
+                    "Информация", MessageBoxButton.OK, MessageBoxImage.Information);
+                return;
+            }
+
+            try
+            {
+                WebBrowserMap.Dispatcher.Invoke(() =>
+                {
+                    try
+                    {
+                        var result = WebBrowserMap.InvokeScript("buildAndShowRoadRoute");
+                        System.Diagnostics.Debug.WriteLine("Build route invoked");
+                    }
+                    catch (Exception ex)
+                    {
+                        System.Diagnostics.Debug.WriteLine($"Error invoking route: {ex.Message}");
+                        MessageBox.Show($"Ошибка построения маршрута: {ex.Message}",
+                            "Ошибка", MessageBoxButton.OK, MessageBoxImage.Error);
+                    }
+                });
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Ошибка: {ex.Message}", "Ошибка",
+                    MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+        }
+
         public class PointsWrapper
         {
             public ObservableCollection<RoutePointViewModel> Points { get; set; } = new();
             public List<TravelStringContract> Strings { get; set; } = new();
         }
 
-        // Вспомогательный класс для десериализации связей из JavaScript
         public class TravelStringContract
         {
             public int From { get; set; }

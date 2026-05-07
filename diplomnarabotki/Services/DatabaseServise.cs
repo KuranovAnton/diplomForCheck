@@ -14,11 +14,13 @@ namespace diplomnarabotki.Services
     public class DatabaseService
     {
         private readonly TravelDbContext _context;
+        private readonly PhotoService _photoService;
 
         public DatabaseService()
         {
             _context = new TravelDbContext();
             _context.Database.EnsureCreated();
+            _photoService = new PhotoService();
         }
 
         public async Task<ObservableCollection<TravelViewModel>> LoadAllTravelsAsync()
@@ -39,7 +41,8 @@ namespace diplomnarabotki.Services
 
             foreach (var entity in travelEntities)
             {
-                travels.Add(ConvertToTravelViewModel(entity));
+                var travelViewModel = await ConvertToTravelViewModelAsync(entity);
+                travels.Add(travelViewModel);
             }
 
             return travels;
@@ -66,7 +69,7 @@ namespace diplomnarabotki.Services
                 else
                 {
                     travel.Id = 0;
-                    var newEntity = ConvertToEntity(travel);
+                    var newEntity = await ConvertToEntityAsync(travel);
                     _context.Travels.Add(newEntity);
                     await _context.SaveChangesAsync();
 
@@ -81,6 +84,11 @@ namespace diplomnarabotki.Services
                         if (savedPoint != null)
                         {
                             point.Id = savedPoint.Id;
+                            // Сохраняем путь к фото, а не base64
+                            if (!string.IsNullOrEmpty(savedPoint.PhotoUrl))
+                            {
+                                point.PhotoUrl = savedPoint.PhotoUrl;
+                            }
                         }
                     }
                 }
@@ -94,9 +102,21 @@ namespace diplomnarabotki.Services
 
         public async Task DeleteTravelAsync(int travelId)
         {
-            var travel = await _context.Travels.FindAsync(travelId);
+            var travel = await _context.Travels
+                .Include(t => t.RoutePoints)
+                .FirstOrDefaultAsync(t => t.Id == travelId);
+
             if (travel != null)
             {
+                // Удаляем все фото, связанные с этим путешествием
+                foreach (var point in travel.RoutePoints)
+                {
+                    if (!string.IsNullOrEmpty(point.PhotoUrl) && point.PhotoUrl.StartsWith("Photos/"))
+                    {
+                        _photoService.DeletePhoto(point.PhotoUrl);
+                    }
+                }
+
                 _context.Travels.Remove(travel);
                 await _context.SaveChangesAsync();
             }
@@ -164,7 +184,7 @@ namespace diplomnarabotki.Services
             }
         }
 
-        private TravelViewModel ConvertToTravelViewModel(TravelEntity entity)
+        private async Task<TravelViewModel> ConvertToTravelViewModelAsync(TravelEntity entity)
         {
             var travel = new TravelViewModel
             {
@@ -229,9 +249,22 @@ namespace diplomnarabotki.Services
                 }
             }
 
-            // Загружаем точки маршрута
+            // Загружаем точки маршрута с фото
             foreach (var pointEntity in entity.RoutePoints.OrderBy(p => p.Order))
             {
+                string photoBase64 = "";
+
+                // Загружаем фото из файла, если есть путь к файлу
+                if (!string.IsNullOrEmpty(pointEntity.PhotoUrl) && pointEntity.PhotoUrl.StartsWith("Photos/"))
+                {
+                    photoBase64 = await _photoService.LoadPhotoAsBase64Async(pointEntity.PhotoUrl);
+                }
+                else if (!string.IsNullOrEmpty(pointEntity.PhotoUrl) && pointEntity.PhotoUrl.StartsWith("data:image"))
+                {
+                    // Если это уже base64 (для обратной совместимости)
+                    photoBase64 = pointEntity.PhotoUrl;
+                }
+
                 var routePoint = new RoutePointViewModel
                 {
                     Id = pointEntity.Id,
@@ -245,7 +278,8 @@ namespace diplomnarabotki.Services
                     IconColor = pointEntity.IconColor,
                     IconSize = pointEntity.IconSize,
                     Status = pointEntity.Status,
-                    PhotoUrl = pointEntity.PhotoUrl,
+                    PhotoUrl = photoBase64, // Загруженное фото в base64 для отображения
+                    StoredPhotoPath = pointEntity.PhotoUrl, // Сохраняем путь для дальнейшего использования
                     VisitDate = pointEntity.VisitDate
                 };
                 travel.RoutePoints.Add(routePoint);
@@ -268,7 +302,7 @@ namespace diplomnarabotki.Services
             return travel;
         }
 
-        private TravelEntity ConvertToEntity(TravelViewModel travel)
+        private async Task<TravelEntity> ConvertToEntityAsync(TravelViewModel travel)
         {
             var entity = new TravelEntity
             {
@@ -326,6 +360,34 @@ namespace diplomnarabotki.Services
             int pointOrder = 0;
             foreach (var point in travel.RoutePoints)
             {
+                string photoPath = point.StoredPhotoPath ?? "";
+
+                // Если есть новое фото в base64, сохраняем его в файл
+                if (!string.IsNullOrEmpty(point.PhotoUrl) && point.PhotoUrl.StartsWith("data:image"))
+                {
+                    // Удаляем старое фото, если оно было
+                    if (!string.IsNullOrEmpty(point.StoredPhotoPath) && point.StoredPhotoPath.StartsWith("Photos/"))
+                    {
+                        _photoService.DeletePhoto(point.StoredPhotoPath);
+                    }
+
+                    // Сохраняем новое фото
+                    photoPath = await _photoService.SavePhotoAsync(
+                        point.PhotoUrl,
+                        travel.Id.ToString(),
+                        pointOrder.ToString()
+                    );
+                }
+                else if (string.IsNullOrEmpty(point.PhotoUrl) && !string.IsNullOrEmpty(point.StoredPhotoPath))
+                {
+                    // Фото было удалено, удаляем файл
+                    if (point.StoredPhotoPath.StartsWith("Photos/"))
+                    {
+                        _photoService.DeletePhoto(point.StoredPhotoPath);
+                    }
+                    photoPath = "";
+                }
+
                 entity.RoutePoints.Add(new RoutePointEntity
                 {
                     Id = point.Id > 0 ? point.Id : 0,
@@ -340,7 +402,7 @@ namespace diplomnarabotki.Services
                     IconColor = point.IconColor,
                     IconSize = point.IconSize,
                     Status = point.Status,
-                    PhotoUrl = point.PhotoUrl?.Length > 450 ? point.PhotoUrl.Substring(0, 450) : point.PhotoUrl ?? "",
+                    PhotoUrl = photoPath, // Сохраняем путь к файлу, а не base64
                     VisitDate = point.VisitDate
                 });
             }
@@ -439,12 +501,40 @@ namespace diplomnarabotki.Services
                 }
             }
 
-            // Создаём новые точки маршрута и запоминаем старые ID
+            // Создаём новые точки маршрута с сохранением фото
             var oldToNewIdMap = new Dictionary<int, int>();
             int pointOrder = 0;
 
             foreach (var point in updated.RoutePoints)
             {
+                string photoPath = point.StoredPhotoPath ?? "";
+
+                // Если есть новое фото в base64, сохраняем его в файл
+                if (!string.IsNullOrEmpty(point.PhotoUrl) && point.PhotoUrl.StartsWith("data:image"))
+                {
+                    // Удаляем старое фото, если оно было
+                    if (!string.IsNullOrEmpty(point.StoredPhotoPath) && point.StoredPhotoPath.StartsWith("Photos/"))
+                    {
+                        _photoService.DeletePhoto(point.StoredPhotoPath);
+                    }
+
+                    // Сохраняем новое фото
+                    photoPath = await _photoService.SavePhotoAsync(
+                        point.PhotoUrl,
+                        existing.Id.ToString(),
+                        pointOrder.ToString()
+                    );
+                }
+                else if (string.IsNullOrEmpty(point.PhotoUrl) && !string.IsNullOrEmpty(point.StoredPhotoPath))
+                {
+                    // Фото было удалено, удаляем файл
+                    if (point.StoredPhotoPath.StartsWith("Photos/"))
+                    {
+                        _photoService.DeletePhoto(point.StoredPhotoPath);
+                    }
+                    photoPath = "";
+                }
+
                 var pointEntity = new RoutePointEntity
                 {
                     TravelId = existing.Id,
@@ -458,7 +548,7 @@ namespace diplomnarabotki.Services
                     IconColor = point.IconColor,
                     IconSize = point.IconSize,
                     Status = point.Status,
-                    PhotoUrl = point.PhotoUrl?.Length > 450 ? point.PhotoUrl.Substring(0, 450) : point.PhotoUrl ?? "",
+                    PhotoUrl = photoPath, // Сохраняем путь к файлу
                     VisitDate = point.VisitDate
                 };
                 existing.RoutePoints.Add(pointEntity);
@@ -474,8 +564,14 @@ namespace diplomnarabotki.Services
             for (int i = 0; i < newPoints.Count && i < oldPointsList.Count; i++)
             {
                 oldToNewIdMap[oldPointsList[i].Id] = newPoints[i].Id;
-                // Обновляем ID в ViewModel
+                // Обновляем ID и путь к фото в ViewModel
                 oldPointsList[i].Id = newPoints[i].Id;
+                oldPointsList[i].StoredPhotoPath = newPoints[i].PhotoUrl;
+                // Очищаем base64 фото после сохранения
+                if (oldPointsList[i].PhotoUrl != null && oldPointsList[i].PhotoUrl.StartsWith("data:image"))
+                {
+                    oldPointsList[i].PhotoUrl = "";
+                }
             }
 
             System.Diagnostics.Debug.WriteLine($"=== Saving strings to DB ===");

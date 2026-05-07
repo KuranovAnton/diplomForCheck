@@ -76,7 +76,15 @@ namespace diplomnarabotki.Services
                 if (File.Exists(fullPath))
                 {
                     var bytes = await File.ReadAllBytesAsync(fullPath);
-                    return $"data:image/png;base64,{Convert.ToBase64String(bytes)}";
+                    var extension = Path.GetExtension(fullPath).ToLower();
+                    var mimeType = extension switch
+                    {
+                        ".jpg" or ".jpeg" => "image/jpeg",
+                        ".png" => "image/png",
+                        ".gif" => "image/gif",
+                        _ => "image/png"
+                    };
+                    return $"data:{mimeType};base64,{Convert.ToBase64String(bytes)}";
                 }
             }
             catch (Exception ex)

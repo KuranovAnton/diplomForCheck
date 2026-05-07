@@ -17,6 +17,7 @@ namespace diplomnarabotki.ViewModels
         private int _iconSize = 36;
         private string _status = "planned";
         private string _photoUrl = "";
+        private string _storedPhotoPath = ""; // Добавленное свойство
         private string _visitDate = "";
 
         public int Id
@@ -89,6 +90,13 @@ namespace diplomnarabotki.ViewModels
         {
             get => _photoUrl;
             set { _photoUrl = value; OnPropertyChanged(); }
+        }
+
+        // Новое свойство для хранения пути к файлу фото
+        public string StoredPhotoPath
+        {
+            get => _storedPhotoPath;
+            set { _storedPhotoPath = value; OnPropertyChanged(); }
         }
 
         public string VisitDate

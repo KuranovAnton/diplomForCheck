@@ -5,7 +5,6 @@ using diplomnarabotki.ViewModels;
 using diplomnarabotki.ViewModels.NoteViewModels;
 using diplomnarabotki.Views;
 using Microsoft.Data.SqlClient;
-using Microsoft.EntityFrameworkCore;
 using System;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
@@ -17,6 +16,7 @@ using System.Text.Json;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
+using System.Windows.Media;
 using System.Windows.Threading;
 
 namespace diplomnarabotki.Views
@@ -33,10 +33,10 @@ namespace diplomnarabotki.Views
         private DispatcherTimer _notificationTimer;
         private SoundPlayer _soundPlayer;
 
-        // Новые поля для поиска и фильтрации
         private string _currentSearchText = string.Empty;
         private string _currentFilterType = "All";
         private List<NoteDisplayItem> _allNotes = new List<NoteDisplayItem>();
+        private NoteDisplayItem _selectedNoteItem;
 
         public Planer()
         {
@@ -54,10 +54,121 @@ namespace diplomnarabotki.Views
             if (LvPinnedNotes != null)
                 UpdatePinnedNotesDisplay();
 
-            if (LbNotes != null)
+            if (IcNotes != null)
                 UpdateNotesDisplay();
 
             InitializeNotificationTimer();
+
+            if (IcNotes != null)
+            {
+                IcNotes.MouseLeftButtonDown += IcNotes_PreviewMouseLeftButtonDown;
+                IcNotes.MouseMove += IcNotes_MouseMove;
+
+                IcNotes.Loaded += (s, ev) => AttachItemHandlers();
+            }
+        }
+
+        private void AttachItemHandlers()
+        {
+            if (IcNotes?.Items == null) return;
+
+            foreach (var item in IcNotes.Items)
+            {
+                var container = IcNotes.ItemContainerGenerator.ContainerFromItem(item) as ContentPresenter;
+                if (container != null)
+                {
+                    var border = FindVisualChild<Border>(container);
+                    if (border != null)
+                    {
+                        border.MouseLeftButtonDown += Item_MouseLeftButtonDown;
+                        border.MouseMove += Item_MouseMove;
+                        border.MouseDown += Item_MouseDown;
+                    }
+                }
+            }
+        }
+
+        private T FindVisualChild<T>(DependencyObject parent) where T : DependencyObject
+        {
+            for (int i = 0; i < VisualTreeHelper.GetChildrenCount(parent); i++)
+            {
+                var child = VisualTreeHelper.GetChild(parent, i);
+                if (child is T typedChild)
+                    return typedChild;
+
+                var result = FindVisualChild<T>(child);
+                if (result != null)
+                    return result;
+            }
+            return null;
+        }
+
+        private void Item_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+        {
+            var border = sender as Border;
+            if (border?.DataContext is NoteDisplayItem noteItem)
+            {
+                _selectedNoteItem = noteItem;
+                _dragStartPoint = e.GetPosition(null);
+                _isDragging = false;
+                e.Handled = false;
+            }
+        }
+
+        private void Item_MouseMove(object sender, MouseEventArgs e)
+        {
+            if (e.LeftButton == MouseButtonState.Pressed && !_isDragging && _selectedNoteItem != null)
+            {
+                var point = e.GetPosition(null);
+                var diff = _dragStartPoint - point;
+
+                if (Math.Abs(diff.X) > SystemParameters.MinimumHorizontalDragDistance ||
+                    Math.Abs(diff.Y) > SystemParameters.MinimumVerticalDragDistance)
+                {
+                    _isDragging = true;
+
+                    try
+                    {
+                        var dataObject = new DataObject();
+                        dataObject.SetData("NoteTitle", _selectedNoteItem.Title);
+                        dataObject.SetData("NoteCreatedDate", _selectedNoteItem.CreatedDate);
+                        dataObject.SetData("NoteType", _selectedNoteItem.NoteType);
+
+                        DragDrop.DoDragDrop(IcNotes, dataObject, DragDropEffects.Move);
+                    }
+                    catch (Exception ex)
+                    {
+                        System.Diagnostics.Debug.WriteLine($"Drag drop error: {ex.Message}");
+                    }
+                    finally
+                    {
+                        _isDragging = false;
+                    }
+                }
+            }
+        }
+
+        private void Item_MouseDown(object sender, MouseButtonEventArgs e)
+        {
+            if (e.ClickCount == 2)
+            {
+                var border = sender as Border;
+                if (border?.DataContext is NoteDisplayItem noteItem)
+                {
+                    EditNote(noteItem.Note);
+                    e.Handled = true;
+                }
+            }
+        }
+
+        private void IcNotes_PreviewMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+        {
+            _dragStartPoint = e.GetPosition(null);
+            _isDragging = false;
+        }
+
+        private void IcNotes_MouseMove(object sender, MouseEventArgs e)
+        {
         }
 
         private async void BtnReloadTravels_Click(object sender, RoutedEventArgs e)
@@ -74,7 +185,7 @@ namespace diplomnarabotki.Views
                 _travels = await _dbService.LoadAllTravelsAsync();
                 CmbTravels.ItemsSource = _travels;
                 CmbTravels.DisplayMemberPath = "Name";
-                CmbTravels.SelectedIndex = -1; // Сброс выбора
+                CmbTravels.SelectedIndex = -1;
 
                 if (_travels.Count > 0)
                 {
@@ -303,7 +414,7 @@ namespace diplomnarabotki.Views
         private void UpdateNotesDisplay()
         {
             if (_currentTravel == null) return;
-            if (LbNotes == null) return;
+            if (IcNotes == null) return;
 
             _allNotes = _currentTravel.Notes.Select(note => new NoteDisplayItem
             {
@@ -325,15 +436,22 @@ namespace diplomnarabotki.Views
         private void ApplySearchAndFilter()
         {
             if (_allNotes == null) return;
-            if (LbNotes == null) return;
+            if (IcNotes == null) return;
 
             var filteredNotes = _allNotes.AsEnumerable();
             filteredNotes = ApplyTypeFilter(filteredNotes);
             filteredNotes = ApplySearchFilter(filteredNotes);
 
             var resultList = filteredNotes.ToList();
-            LbNotes.ItemsSource = resultList;
+            IcNotes.ItemsSource = resultList;
             UpdateSearchResultsInfo(resultList.Count, _allNotes.Count);
+
+            if (EmptyNotesText != null)
+            {
+                EmptyNotesText.Visibility = resultList.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
+            }
+
+            Dispatcher.BeginInvoke(new Action(() => AttachItemHandlers()), DispatcherPriority.Loaded);
         }
 
         private IEnumerable<NoteDisplayItem> ApplyTypeFilter(IEnumerable<NoteDisplayItem> notes)
@@ -483,11 +601,11 @@ namespace diplomnarabotki.Views
                 if (filteredCount == 0)
                 {
                     TxtSearchResults.Text += "\n⚠️ Ничего не найдено. Попробуйте изменить поисковый запрос или фильтр.";
-                    TxtSearchResults.Foreground = System.Windows.Media.Brushes.Orange;
+                    TxtSearchResults.Foreground = Brushes.Orange;
                 }
                 else
                 {
-                    TxtSearchResults.Foreground = System.Windows.Media.Brushes.Green;
+                    TxtSearchResults.Foreground = Brushes.Green;
                 }
             }
             else
@@ -761,61 +879,13 @@ namespace diplomnarabotki.Views
             }
         }
 
-        private void LbNotes_PreviewMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
-        {
-            _dragStartPoint = e.GetPosition(null);
-            _isDragging = false;
-
-            var item = ItemsControl.ContainerFromElement(LbNotes, e.OriginalSource as DependencyObject) as ListBoxItem;
-            if (item != null)
-            {
-                item.IsSelected = true;
-            }
-        }
-
-        private void LbNotes_MouseMove(object sender, MouseEventArgs e)
-        {
-            if (e.LeftButton == MouseButtonState.Pressed && !_isDragging)
-            {
-                var point = e.GetPosition(null);
-                var diff = _dragStartPoint - point;
-
-                if (Math.Abs(diff.X) > SystemParameters.MinimumHorizontalDragDistance ||
-                    Math.Abs(diff.Y) > SystemParameters.MinimumVerticalDragDistance)
-                {
-                    if (LbNotes.SelectedItem is NoteDisplayItem selectedDisplayItem)
-                    {
-                        _isDragging = true;
-
-                        try
-                        {
-                            var dataObject = new DataObject();
-                            dataObject.SetData("NoteTitle", selectedDisplayItem.Title);
-                            dataObject.SetData("NoteCreatedDate", selectedDisplayItem.CreatedDate);
-                            dataObject.SetData("NoteType", selectedDisplayItem.NoteType);
-
-                            DragDrop.DoDragDrop(LbNotes, dataObject, DragDropEffects.Move);
-                        }
-                        catch (Exception ex)
-                        {
-                            System.Diagnostics.Debug.WriteLine($"Drag drop error: {ex.Message}");
-                        }
-                        finally
-                        {
-                            _isDragging = false;
-                        }
-                    }
-                }
-            }
-        }
-
         private void PinnedNotesArea_DragEnter(object sender, DragEventArgs e)
         {
             if (e.Data.GetDataPresent("NoteTitle") && e.Data.GetDataPresent("NoteCreatedDate"))
             {
                 e.Effects = DragDropEffects.Move;
-                PinnedNotesArea.Background = System.Windows.Media.Brushes.LightGoldenrodYellow;
-                PinnedNotesArea.BorderBrush = System.Windows.Media.Brushes.Orange;
+                PinnedNotesArea.Background = Brushes.LightGoldenrodYellow;
+                PinnedNotesArea.BorderBrush = Brushes.Orange;
             }
             else
             {
@@ -839,8 +909,8 @@ namespace diplomnarabotki.Views
 
         private void PinnedNotesArea_DragLeave(object sender, DragEventArgs e)
         {
-            PinnedNotesArea.Background = System.Windows.Media.Brushes.LightYellow;
-            PinnedNotesArea.BorderBrush = System.Windows.Media.Brushes.Goldenrod;
+            PinnedNotesArea.Background = Brushes.LightYellow;
+            PinnedNotesArea.BorderBrush = Brushes.Goldenrod;
             e.Handled = true;
         }
 
@@ -848,8 +918,8 @@ namespace diplomnarabotki.Views
         {
             try
             {
-                PinnedNotesArea.Background = System.Windows.Media.Brushes.LightYellow;
-                PinnedNotesArea.BorderBrush = System.Windows.Media.Brushes.Goldenrod;
+                PinnedNotesArea.Background = Brushes.LightYellow;
+                PinnedNotesArea.BorderBrush = Brushes.Goldenrod;
 
                 if (_currentTravel != null &&
                     e.Data.GetDataPresent("NoteTitle") &&
@@ -960,12 +1030,12 @@ namespace diplomnarabotki.Views
                 _currentTravel.Name = TxtTravelName.Text;
                 _currentTravel.Route = TxtRoute.Text;
 
-                using var connection = new Microsoft.Data.SqlClient.SqlConnection(
+                using var connection = new SqlConnection(
                     "Server=DESKTOP-11PGGLI\\SQLEXPRESS;Database=TravelJournalDb;Trusted_Connection=True;TrustServerCertificate=True");
 
                 await connection.OpenAsync();
 
-                var command = new Microsoft.Data.SqlClient.SqlCommand(
+                var command = new SqlCommand(
                     "UPDATE Travels SET Name = @Name, Route = @Route WHERE Id = @Id", connection);
                 command.Parameters.AddWithValue("@Id", _currentTravel.Id);
                 command.Parameters.AddWithValue("@Name", _currentTravel.Name);
@@ -992,7 +1062,6 @@ namespace diplomnarabotki.Views
                 MessageBoxButton.OK, MessageBoxImage.Information);
         }
 
-        // ГЛАВНОЕ ИСПРАВЛЕНИЕ - SelectionChanged
         private void CmbTravels_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
             if (CmbTravels.SelectedItem is TravelViewModel selectedTravel)
@@ -1004,21 +1073,17 @@ namespace diplomnarabotki.Views
                 System.Diagnostics.Debug.WriteLine($"Name: '{_currentTravel.Name}'");
                 System.Diagnostics.Debug.WriteLine($"Route: '{_currentTravel.Route}'");
 
-                // ВАЖНО: Отключаем обработчики событий временно
                 TxtTravelName.TextChanged -= TravelInfo_Changed;
                 TxtRoute.TextChanged -= TravelInfo_Changed;
 
-                // Устанавливаем значения
                 TxtTravelName.Text = _currentTravel.Name ?? "";
                 TxtRoute.Text = _currentTravel.Route ?? "";
 
-                // Включаем обработчики обратно
                 TxtTravelName.TextChanged += TravelInfo_Changed;
                 TxtRoute.TextChanged += TravelInfo_Changed;
 
                 System.Diagnostics.Debug.WriteLine($"UI Route set to: '{TxtRoute.Text}'");
 
-                // Обновляем заметки
                 _currentSearchText = string.Empty;
                 _currentFilterType = "All";
 
@@ -1448,7 +1513,7 @@ namespace diplomnarabotki.Views
 
         private void RefreshNotesDisplay()
         {
-            if (LbNotes != null)
+            if (IcNotes != null)
             {
                 UpdateNotesDisplay();
             }
@@ -1461,9 +1526,9 @@ namespace diplomnarabotki.Views
 
         private async void BtnDeleteNote_Click(object sender, RoutedEventArgs e)
         {
-            if (LbNotes.SelectedItem is NoteDisplayItem selectedDisplayItem && _currentTravel != null)
+            if (_selectedNoteItem != null && _currentTravel != null)
             {
-                var selectedNote = selectedDisplayItem.Note;
+                var selectedNote = _selectedNoteItem.Note;
                 _currentTravel.Notes.Remove(selectedNote);
 
                 if (_currentTravel.PinnedNotes.Contains(selectedNote))
@@ -1474,6 +1539,7 @@ namespace diplomnarabotki.Views
 
                 await _dbService.SaveTravelAsync(_currentTravel);
                 UpdateNotesDisplay();
+                _selectedNoteItem = null;
             }
             else
             {
@@ -1482,95 +1548,87 @@ namespace diplomnarabotki.Views
             }
         }
 
-        private void LbNotes_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        private void EditNote(NoteBaseViewModel selectedNote)
         {
-        }
+            _editingNote = selectedNote;
+            TxtNoteTitle.Text = selectedNote.Title;
 
-        private void LbNotes_MouseDoubleClick(object sender, MouseButtonEventArgs e)
-        {
-            if (LbNotes.SelectedItem is NoteDisplayItem selectedDisplayItem)
+            switch (selectedNote)
             {
-                var selectedNote = selectedDisplayItem.Note;
-                _editingNote = selectedNote;
-                TxtNoteTitle.Text = selectedNote.Title;
+                case TextNoteViewModel textNote:
+                    CmbNoteType.SelectedIndex = 0;
+                    TxtNoteContent.Text = textNote.Content;
+                    break;
 
-                switch (selectedNote)
-                {
-                    case TextNoteViewModel textNote:
-                        CmbNoteType.SelectedIndex = 0;
-                        TxtNoteContent.Text = textNote.Content;
-                        break;
-
-                    case ListNoteViewModel listNote:
-                        CmbNoteType.SelectedIndex = 1;
-                        var listItems = new ObservableCollection<ListItemModel>();
-                        if (listNote.Items != null)
-                        {
-                            foreach (var item in listNote.Items)
-                            {
-                                listItems.Add(new ListItemModel { Text = item.Text });
-                            }
-                        }
-                        if (LvListItems != null)
-                            LvListItems.ItemsSource = listItems;
-                        break;
-
-                    case ChecklistNoteViewModel checklistNote:
-                        CmbNoteType.SelectedIndex = 2;
-                        var checklistItems = new ObservableCollection<ChecklistItemModel>();
-                        if (checklistNote.Items != null)
-                        {
-                            foreach (var item in checklistNote.Items)
-                            {
-                                checklistItems.Add(new ChecklistItemModel
-                                {
-                                    ItemName = item.ItemName,
-                                    IsChecked = item.IsChecked
-                                });
-                            }
-                        }
-                        if (LvChecklistItems != null)
-                            LvChecklistItems.ItemsSource = checklistItems;
-                        break;
-                }
-
-                if (selectedNote.Notification != null && selectedNote.Notification.IsEnabled)
-                {
-                    ChkEnableNotification.IsChecked = true;
-                    DatePickerReminder.SelectedDate = selectedNote.Notification.ReminderTime.Date;
-                    TimePickerReminder.Text = selectedNote.Notification.ReminderTime.ToString("HH:mm");
-
-                    if (CmbRepeatType.Items.Count > 0)
+                case ListNoteViewModel listNote:
+                    CmbNoteType.SelectedIndex = 1;
+                    var listItems = new ObservableCollection<ListItemModel>();
+                    if (listNote.Items != null)
                     {
-                        foreach (ComboBoxItem item in CmbRepeatType.Items)
+                        foreach (var item in listNote.Items)
                         {
-                            if (item.Tag?.ToString() == selectedNote.Notification.RepeatType.ToString())
-                            {
-                                CmbRepeatType.SelectedItem = item;
-                                break;
-                            }
+                            listItems.Add(new ListItemModel { Text = item.Text });
                         }
                     }
+                    if (LvListItems != null)
+                        LvListItems.ItemsSource = listItems;
+                    break;
 
-                    if (CmbSound.Items.Count > 0)
+                case ChecklistNoteViewModel checklistNote:
+                    CmbNoteType.SelectedIndex = 2;
+                    var checklistItems = new ObservableCollection<ChecklistItemModel>();
+                    if (checklistNote.Items != null)
                     {
-                        foreach (ComboBoxItem item in CmbSound.Items)
+                        foreach (var item in checklistNote.Items)
                         {
-                            if (item.Tag?.ToString() == selectedNote.Notification.Sound.ToString())
+                            checklistItems.Add(new ChecklistItemModel
                             {
-                                CmbSound.SelectedItem = item;
-                                break;
-                            }
+                                ItemName = item.ItemName,
+                                IsChecked = item.IsChecked
+                            });
                         }
                     }
-                }
-                else
-                {
-                    ChkEnableNotification.IsChecked = false;
-                }
-
-                NoteDialog.Visibility = Visibility.Visible;
+                    if (LvChecklistItems != null)
+                        LvChecklistItems.ItemsSource = checklistItems;
+                    break;
             }
+
+            if (selectedNote.Notification != null && selectedNote.Notification.IsEnabled)
+            {
+                ChkEnableNotification.IsChecked = true;
+                DatePickerReminder.SelectedDate = selectedNote.Notification.ReminderTime.Date;
+                TimePickerReminder.Text = selectedNote.Notification.ReminderTime.ToString("HH:mm");
+
+                if (CmbRepeatType.Items.Count > 0)
+                {
+                    foreach (ComboBoxItem item in CmbRepeatType.Items)
+                    {
+                        if (item.Tag?.ToString() == selectedNote.Notification.RepeatType.ToString())
+                        {
+                            CmbRepeatType.SelectedItem = item;
+                            break;
+                        }
+                    }
+                }
+
+                if (CmbSound.Items.Count > 0)
+                {
+                    foreach (ComboBoxItem item in CmbSound.Items)
+                    {
+                        if (item.Tag?.ToString() == selectedNote.Notification.Sound.ToString())
+                        {
+                            CmbSound.SelectedItem = item;
+                            break;
+                        }
+                    }
+                }
+            }
+            else
+            {
+                ChkEnableNotification.IsChecked = false;
+            }
+
+            NoteDialog.Visibility = Visibility.Visible;
         }
 
         private async void LvPinnedNotes_MouseDoubleClick(object sender, MouseButtonEventArgs e)
