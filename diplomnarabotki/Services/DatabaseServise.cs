@@ -73,7 +73,6 @@ namespace diplomnarabotki.Services
                     _context.Travels.Add(newEntity);
                     await _context.SaveChangesAsync();
 
-                    // Обновляем ID у ViewModel после сохранения
                     travel.Id = newEntity.Id;
                     foreach (var point in travel.RoutePoints)
                     {
@@ -84,7 +83,6 @@ namespace diplomnarabotki.Services
                         if (savedPoint != null)
                         {
                             point.Id = savedPoint.Id;
-                            // Сохраняем путь к фото, а не base64
                             if (!string.IsNullOrEmpty(savedPoint.PhotoUrl))
                             {
                                 point.PhotoUrl = savedPoint.PhotoUrl;
@@ -108,7 +106,6 @@ namespace diplomnarabotki.Services
 
             if (travel != null)
             {
-                // Удаляем все фото, связанные с этим путешествием
                 foreach (var point in travel.RoutePoints)
                 {
                     if (!string.IsNullOrEmpty(point.PhotoUrl) && point.PhotoUrl.StartsWith("Photos/"))
@@ -249,19 +246,16 @@ namespace diplomnarabotki.Services
                 }
             }
 
-            // Загружаем точки маршрута с фото
             foreach (var pointEntity in entity.RoutePoints.OrderBy(p => p.Order))
             {
                 string photoBase64 = "";
 
-                // Загружаем фото из файла, если есть путь к файлу
                 if (!string.IsNullOrEmpty(pointEntity.PhotoUrl) && pointEntity.PhotoUrl.StartsWith("Photos/"))
                 {
                     photoBase64 = await _photoService.LoadPhotoAsBase64Async(pointEntity.PhotoUrl);
                 }
                 else if (!string.IsNullOrEmpty(pointEntity.PhotoUrl) && pointEntity.PhotoUrl.StartsWith("data:image"))
                 {
-                    // Если это уже base64 (для обратной совместимости)
                     photoBase64 = pointEntity.PhotoUrl;
                 }
 
@@ -278,14 +272,13 @@ namespace diplomnarabotki.Services
                     IconColor = pointEntity.IconColor,
                     IconSize = pointEntity.IconSize,
                     Status = pointEntity.Status,
-                    PhotoUrl = photoBase64, // Загруженное фото в base64 для отображения
-                    StoredPhotoPath = pointEntity.PhotoUrl, // Сохраняем путь для дальнейшего использования
+                    PhotoUrl = photoBase64,
+                    StoredPhotoPath = pointEntity.PhotoUrl,
                     VisitDate = pointEntity.VisitDate
                 };
                 travel.RoutePoints.Add(routePoint);
             }
 
-            // Загружаем связи используя ID точек
             foreach (var stringEntity in entity.TravelStrings)
             {
                 travel.TravelStrings.Add(new TravelStringViewModel
@@ -378,6 +371,11 @@ namespace diplomnarabotki.Services
                         pointOrder.ToString()
                     );
                 }
+                else if (!string.IsNullOrEmpty(point.StoredPhotoPath) && string.IsNullOrEmpty(point.PhotoUrl))
+                {
+                    // Фото не менялось, оставляем существующий путь
+                    photoPath = point.StoredPhotoPath;
+                }
                 else if (string.IsNullOrEmpty(point.PhotoUrl) && !string.IsNullOrEmpty(point.StoredPhotoPath))
                 {
                     // Фото было удалено, удаляем файл
@@ -402,7 +400,7 @@ namespace diplomnarabotki.Services
                     IconColor = point.IconColor,
                     IconSize = point.IconSize,
                     Status = point.Status,
-                    PhotoUrl = photoPath, // Сохраняем путь к файлу, а не base64
+                    PhotoUrl = photoPath,
                     VisitDate = point.VisitDate
                 });
             }
@@ -533,6 +531,11 @@ namespace diplomnarabotki.Services
                         existingPoint.PhotoUrl = "";
                         point.StoredPhotoPath = "";
                     }
+                    else if (!string.IsNullOrEmpty(point.StoredPhotoPath) && string.IsNullOrEmpty(point.PhotoUrl))
+                    {
+                        // Фото не менялось, сохраняем существующий путь
+                        existingPoint.PhotoUrl = point.StoredPhotoPath;
+                    }
 
                     updatedPointIds.Add(existingPoint.Id);
                 }
@@ -545,6 +548,10 @@ namespace diplomnarabotki.Services
                         photoPath = await _photoService.SavePhotoAsync(point.PhotoUrl, existing.Id.ToString(), pointOrder.ToString());
                         point.PhotoUrl = "";
                         point.StoredPhotoPath = photoPath;
+                    }
+                    else if (!string.IsNullOrEmpty(point.StoredPhotoPath))
+                    {
+                        photoPath = point.StoredPhotoPath;
                     }
 
                     var newPoint = new RoutePointEntity
@@ -584,16 +591,12 @@ namespace diplomnarabotki.Services
             await _context.SaveChangesAsync();
 
             // ========== 3. СОЗДАЁМ МАППИНГ ID И СОХРАНЯЕМ СВЯЗИ ==========
-            // Сначала сохраняем все изменения
             await _context.SaveChangesAsync();
 
-            // Создаём словарь для маппинга старых ID (временных) на новые ID (из БД)
             var idMapping = new Dictionary<int, int>();
 
-            // Сначала добавляем все существующие точки из updated.RoutePoints
             foreach (var point in updated.RoutePoints)
             {
-                // Ищем точку в existing.RoutePoints по координатам и названию
                 var existingPoint = existing.RoutePoints.FirstOrDefault(p =>
                     Math.Abs(p.Latitude - point.Latitude) < 0.000001 &&
                     Math.Abs(p.Longitude - point.Longitude) < 0.000001 &&
@@ -601,7 +604,6 @@ namespace diplomnarabotki.Services
 
                 if (existingPoint != null)
                 {
-                    // Если ID изменился, добавляем в маппинг
                     if (point.Id != existingPoint.Id)
                     {
                         idMapping[point.Id] = existingPoint.Id;
@@ -628,7 +630,6 @@ namespace diplomnarabotki.Services
                 int newFromId = travelString.From;
                 int newToId = travelString.To;
 
-                // Заменяем временные ID на настоящие
                 if (idMapping.ContainsKey(travelString.From))
                 {
                     newFromId = idMapping[travelString.From];
@@ -641,7 +642,6 @@ namespace diplomnarabotki.Services
                     System.Diagnostics.Debug.WriteLine($"Remapped To: {travelString.To} -> {newToId}");
                 }
 
-                // Проверяем, что ID существуют
                 var fromExists = existing.RoutePoints.Any(p => p.Id == newFromId);
                 var toExists = existing.RoutePoints.Any(p => p.Id == newToId);
 

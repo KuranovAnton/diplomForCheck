@@ -190,11 +190,22 @@ namespace diplomnarabotki.Views
                 var simplePoints = new List<object>();
                 foreach (var point in _currentTravel.RoutePoints)
                 {
-                    string displayPhoto = point.PhotoUrl ?? "";
+                    string displayPhoto = "";
+
+                    // Загружаем фото из файла в base64, если есть путь
+                    if (!string.IsNullOrEmpty(point.StoredPhotoPath) && point.StoredPhotoPath.StartsWith("Photos/"))
+                    {
+                        displayPhoto = await _photoService.LoadPhotoAsBase64Async(point.StoredPhotoPath);
+                    }
+                    else if (!string.IsNullOrEmpty(point.PhotoUrl) && point.PhotoUrl.StartsWith("data:image"))
+                    {
+                        // Если уже base64 (для обратной совместимости)
+                        displayPhoto = point.PhotoUrl;
+                    }
 
                     simplePoints.Add(new
                     {
-                        Id = point.Id,  // ✅ ЭТО САМОЕ ВАЖНОЕ - ДОБАВЬ!
+                        Id = point.Id,
                         Latitude = point.Latitude,
                         Longitude = point.Longitude,
                         Title = point.Title ?? "Place",
@@ -223,17 +234,19 @@ namespace diplomnarabotki.Views
                     {
                         System.Diagnostics.Debug.WriteLine($"Processing string: From={s.From}, To={s.To}");
 
-                        if (idToIndex.ContainsKey(s.From) && idToIndex.ContainsKey(s.To))
+                        // Проверяем, что точки с такими ID существуют
+                        if (_currentTravel.RoutePoints.Any(p => p.Id == s.From) &&
+                            _currentTravel.RoutePoints.Any(p => p.Id == s.To))
                         {
                             stringList.Add(new
                             {
-                                from = idToIndex[s.From],
-                                to = idToIndex[s.To],
+                                fromId = s.From,  // ✅ Отправляем настоящий ID
+                                toId = s.To,      // ✅ Отправляем настоящий ID
                                 description = s.Description ?? "",
                                 color = s.Color ?? "#ed8936",
                                 width = s.Width > 0 ? s.Width : 2
                             });
-                            System.Diagnostics.Debug.WriteLine($"Added string: ID {s.From}->{s.To} converted to Index {idToIndex[s.From]}->{idToIndex[s.To]}");
+                            System.Diagnostics.Debug.WriteLine($"Added string: ID {s.From}->{s.To}");
                         }
                         else
                         {
@@ -371,10 +384,11 @@ namespace diplomnarabotki.Views
                     _currentTravel.TravelStrings.Clear();
                     foreach (var travelString in wrapper.Strings)
                     {
+                        // travelString.From и travelString.To теперь содержат ID, а не индексы
                         _currentTravel.TravelStrings.Add(new TravelStringViewModel
                         {
-                            From = travelString.From,
-                            To = travelString.To,
+                            From = travelString.From,   // Это уже ID
+                            To = travelString.To,       // Это уже ID
                             Description = travelString.Description ?? "",
                             Color = travelString.Color ?? "#ed8936",
                             Width = travelString.Width > 0 ? travelString.Width : 2
