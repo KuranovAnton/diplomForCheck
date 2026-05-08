@@ -1,5 +1,4 @@
-﻿﻿
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html>
 <head>
     <meta charset="utf-8" />
@@ -707,7 +706,7 @@
                 </div>
             </div>
             <div class="modal-footer">
-                <button class="save" onclick="addConnection()">✅ Добавить связь</button>
+                <button class="save" onclick="addConnectionSave()">✅ Добавить связь</button>
                 <button class="cancel" onclick="closeConnectionModal()">❌ Отмена</button>
             </div>
         </div>
@@ -794,8 +793,8 @@
         var markers = [];
         var strings = [];
         var currentLines = [];
+        var currentEditingId = -1;
         var storageAvailable = false;
-        var currentEditingIndex = -1;
         var selectedIcon = '📍';
         var iconColor = '#e2e8f0';
         var iconSize = 36;
@@ -805,7 +804,6 @@
         var showGlobalLabels = true;
         var cacheStats = { tilesLoaded: 0, tilesCached: 0, onlineMode: true };
 
-        // Переменные для редактирования связи
         var currentEditingConnectionIndex = -1;
         var editStringColor = '#ed8936';
         var editStringWidth = 2;
@@ -813,7 +811,6 @@
         var editStringHueCanvas = null;
         var editStringCurrentHue = 0;
 
-        // Палитры
         var iconGradientCanvas = null;
         var iconHueCanvas = null;
         var iconCurrentHue = 0;
@@ -826,7 +823,21 @@
         var stringColor = '#ed8936';
         var stringWidth = 2;
 
-        // Общие функции
+        // ========== ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ ДЛЯ ES5 ==========
+        function findMarkerById(id) {
+            for (var i = 0; i < markers.length; i++) {
+                if (markers[i].id === id) return markers[i];
+            }
+            return null;
+        }
+
+        function findMarkerIndexById(id) {
+            for (var i = 0; i < markers.length; i++) {
+                if (markers[i].id === id) return i;
+            }
+            return -1;
+        }
+
         function updateCacheStatus() {
             var statusDiv = document.getElementById('cacheStatus');
             if (statusDiv) {
@@ -895,10 +906,8 @@
             });
         }
 
-        // ЗАМЕНИТЕ ЭТУ ФУНКЦИЮ В ВАШЕМ HTML-ФАЙЛЕ
         function createCurvedLine(sLat, sLng, eLat, eLng, color, weight) {
             try {
-                // Переводим координаты в пиксели для точного контроля изгиба
                 var p1 = map.latLngToLayerPoint([sLat, sLng]);
                 var p2 = map.latLngToLayerPoint([eLat, eLng]);
 
@@ -909,13 +918,9 @@
                 var dy = p2.y - p1.y;
                 var distance = Math.sqrt(dx * dx + dy * dy);
 
-                // Провис: 12% от расстояния, но не менее 25px и не более 80px
                 var sag = Math.min(Math.max(distance * 0.12, 25), 80);
-
-                // КЛЮЧЕВОЙ МОМЕНТ: ВСЕГДА ВНИЗ (увеличение Y)
                 var controlY = midY + sag;
 
-                // Строим точки кривой
                 var points = [];
                 for (var t = 0; t <= 1; t += 0.04) {
                     var mt = 1 - t;
@@ -932,7 +937,6 @@
             }
         }
 
-        // Функции для градиентов
         function drawHueGradient(canvas) {
             if (!canvas) return;
             var ctx = canvas.getContext('2d');
@@ -972,7 +976,6 @@
             return '#' + ((1 << 24) + (r << 16) + (g << 8) + b).toString(16).slice(1);
         }
 
-        // Инициализация палитры для иконок
         function initIconPicker() {
             var palette = document.getElementById('iconGradientPalette');
             var hueSlider = document.getElementById('iconHueSlider');
@@ -1016,7 +1019,6 @@
             };
         }
 
-        // Инициализация палитры для названий
         function initLabelPicker() {
             var palette = document.getElementById('labelGradientPalette');
             var hueSlider = document.getElementById('labelHueSlider');
@@ -1060,7 +1062,6 @@
             };
         }
 
-        // Инициализация палитры для цвета соединений (новая связь)
         function initStringColorPicker() {
             var palette = document.getElementById('stringGradientPalette');
             var hueSlider = document.getElementById('stringHueSlider');
@@ -1104,7 +1105,6 @@
             };
         }
 
-        // Инициализация палитры для редактирования связи
         function initEditStringColorPicker() {
             var palette = document.getElementById('editStringGradientPalette');
             var hueSlider = document.getElementById('editStringHueSlider');
@@ -1182,7 +1182,6 @@
             if (hex) hex.value = color.toUpperCase();
         }
 
-        // Обработчики HEX
         var iconHexInput = document.getElementById('iconHexValue');
         if (iconHexInput) {
             iconHexInput.onchange = function (e) {
@@ -1219,7 +1218,6 @@
             };
         }
 
-        // Обработчики ширины линии
         var stringWidthInput = document.getElementById('stringWidth');
         if (stringWidthInput) {
             stringWidthInput.oninput = function (e) {
@@ -1280,7 +1278,6 @@
             sp.style.color = iconColor;
         }
 
-        // Кэширование тайлов
         var CachedTileLayer = L.TileLayer.extend({
             initialize: function (url, opts) {
                 this._url = url;
@@ -1424,10 +1421,12 @@
                     }
                 }
                 currentLines = [];
+
                 for (var i = 0; i < strings.length; i++) {
                     var s = strings[i];
-                    var fromPoint = markers[s.from];
-                    var toPoint = markers[s.to];
+                    var fromPoint = findMarkerById(s.fromId);
+                    var toPoint = findMarkerById(s.toId);
+
                     if (fromPoint && toPoint) {
                         var line = createCurvedLine(fromPoint.lat, fromPoint.lng, toPoint.lat, toPoint.lng, s.color || '#ed8936', s.width || 2);
                         if (line) {
@@ -1442,7 +1441,7 @@
             }
         }
 
-        function addMarker(lat, lng, title, emoji, desc, color, size, status, photo, date) {
+        function addMarker(lat, lng, title, emoji, desc, color, size, status, photo, date, pointId) {
             try {
                 emoji = (emoji && typeof emoji === 'string') ? emoji : '📍';
                 desc = (desc && typeof desc === 'string') ? desc : '';
@@ -1451,37 +1450,48 @@
                 status = (status && typeof status === 'string') ? status : 'planned';
                 photo = (photo && typeof photo === 'string') ? photo : '';
                 date = (date && typeof date === 'string') ? date : '';
+
                 if (typeof lat !== 'number' || typeof lng !== 'number' || isNaN(lat) || isNaN(lng)) {
                     console.error('Invalid coordinates:', lat, lng);
                     return null;
                 }
+
                 var icon = createIcon(emoji, color, size, title, status);
                 var marker = L.marker([lat, lng], { draggable: true, icon: icon }).addTo(map);
-                var idx = markers.length;
+
+                // Для новых точек генерируем уникальный отрицательный ID
+                var newId = (pointId && pointId > 0) ? pointId : -(Math.floor(Math.random() * 2147483647) + 1);
+
                 var statusText = '';
                 if (status === 'visited') statusText = '✅ Посещено';
                 else if (status === 'planned') statusText = '📅 Запланировано';
                 else statusText = '⭐ Хочу посетить';
+
                 var popup = '<b>' + escapeHtml(title) + '</b><br/>📍 ' + lat.toFixed(5) + ', ' + lng.toFixed(5) + '<br/>📌 ' + statusText;
                 if (date) popup += '<br/>📅 ' + date;
                 if (desc) popup += '<br/>📖 ' + desc;
                 if (photo) popup += '<br/><img src="' + photo + '" style="max-width:150px;max-height:100px;border-radius:8px;margin-top:5px;" />';
-                popup += '<br/><button onclick="openEditModal(' + idx + ')">✏️ Редактировать</button> <button onclick="removeMarker(' + idx + ')">🗑️ Удалить</button>';
+                popup += '<br/><button onclick="openEditModal(' + newId + ')">✏️ Редактировать</button> <button onclick="removeMarker(' + newId + ')">🗑️ Удалить</button>';
                 marker.bindPopup(popup);
+
                 marker.on('dragend', function () {
                     var pos = marker.getLatLng();
-                    if (markers[idx]) {
-                        markers[idx].lat = pos.lat;
-                        markers[idx].lng = pos.lng;
+                    var markerData = findMarkerById(newId);
+                    if (markerData) {
+                        markerData.lat = pos.lat;
+                        markerData.lng = pos.lng;
                         drawAllStrings();
                         saveToCSharp();
                     }
                 });
+
                 marker.on('click', function (e) {
-                    openEditModal(idx);
+                    openEditModal(newId);
                     if (L.DomEvent) L.DomEvent.stopPropagation(e);
                 });
+
                 markers.push({
+                    id: newId,
                     marker: marker,
                     lat: lat,
                     lng: lng,
@@ -1494,6 +1504,7 @@
                     photoUrl: photo,
                     visitDate: date
                 });
+
                 updatePointCount();
                 drawAllStrings();
                 saveToCSharp();
@@ -1542,21 +1553,24 @@
             }
         }
 
-        function openEditModal(idx) {
-            currentEditingIndex = idx;
-            var p = markers[idx];
-            document.getElementById('editTitle').value = p.title;
-            document.getElementById('editDescription').value = p.description || '';
-            document.getElementById('iconSize').value = p.iconSize || 36;
-            if (p.visitDate) $("#visitDatePicker").val(p.visitDate);
+        function openEditModal(pointId) {
+            currentEditingId = pointId;
+            var point = findMarkerById(pointId);
+            if (!point) return;
+
+            document.getElementById('editTitle').value = point.title;
+            document.getElementById('editDescription').value = point.description || '';
+            document.getElementById('iconSize').value = point.iconSize || 36;
+            if (point.visitDate) $("#visitDatePicker").val(point.visitDate);
             else $("#visitDatePicker").val('');
-            document.getElementById('photoUrl').value = p.photoUrl || '';
+            document.getElementById('photoUrl').value = point.photoUrl || '';
             document.getElementById('photoFile').value = '';
             updatePhotoPreview();
-            selectedIcon = p.iconEmoji;
-            iconColor = p.iconColor || '#e2e8f0';
-            iconSize = p.iconSize || 36;
-            selectedStatus = p.status || 'planned';
+            selectedIcon = point.iconEmoji;
+            iconColor = point.iconColor || '#e2e8f0';
+            iconSize = point.iconSize || 36;
+            selectedStatus = point.status || 'planned';
+
             var btns = document.querySelectorAll('.status-btn');
             for (var i = 0; i < btns.length; i++) {
                 btns[i].classList.remove('selected');
@@ -1565,6 +1579,7 @@
             else if (selectedStatus === 'visited') btns[1].classList.add('selected');
             else btns[2].classList.add('selected');
             document.getElementById('statusValue').value = selectedStatus;
+
             setTimeout(function () {
                 if (iconGradientCanvas) {
                     drawColorGradient(iconGradientCanvas, iconCurrentHue);
@@ -1573,26 +1588,29 @@
                 }
                 setIconColor(iconColor);
             }, 50);
+
             updateSizePreview();
             document.getElementById('sizePreview').innerHTML = selectedIcon;
+
             var icons = document.querySelectorAll('.icon-option');
             for (var i = 0; i < icons.length; i++) {
                 icons[i].classList.remove('selected');
             }
             for (var i = 0; i < icons.length; i++) {
                 var span = icons[i].querySelector('span');
-                if (span && span.innerText === p.iconEmoji) {
+                if (span && span.innerText === point.iconEmoji) {
                     icons[i].classList.add('selected');
                     break;
                 }
             }
+
             document.getElementById('editModal').style.display = 'block';
             $("#editModalContent").css({ top: '15%', left: 'calc(50% - 250px)' });
         }
 
         function closeEditModal() {
             document.getElementById('editModal').style.display = 'none';
-            currentEditingIndex = -1;
+            currentEditingId = -1;
         }
 
         function selectIcon(emoji, el) {
@@ -1606,46 +1624,89 @@
         }
 
         function savePointEdit() {
-            if (currentEditingIndex >= 0 && markers[currentEditingIndex]) {
-                var p = markers[currentEditingIndex];
+            if (currentEditingId) {
+                var point = findMarkerById(currentEditingId);
+                if (!point) return;
+
                 var newTitle = document.getElementById('editTitle').value;
                 if (newTitle === '') newTitle = 'Новое место';
-                p.title = newTitle;
-                p.description = document.getElementById('editDescription').value;
-                p.iconEmoji = selectedIcon;
-                p.iconColor = iconColor;
-                p.iconSize = parseInt(document.getElementById('iconSize').value, 10);
-                p.status = document.getElementById('statusValue').value;
-                p.photoUrl = document.getElementById('photoUrl').value;
-                p.visitDate = $("#visitDatePicker").val();
-                updateMarkerIcon(currentEditingIndex);
+                point.title = newTitle;
+                point.description = document.getElementById('editDescription').value;
+                point.iconEmoji = selectedIcon;
+                point.iconColor = iconColor;
+                point.iconSize = parseInt(document.getElementById('iconSize').value, 10);
+                point.status = document.getElementById('statusValue').value;
+                point.photoUrl = document.getElementById('photoUrl').value;
+                point.visitDate = $("#visitDatePicker").val();
+
+                updateMarkerIconById(currentEditingId);
                 drawAllStrings();
                 saveToCSharp();
             }
             closeEditModal();
         }
 
-        function removeMarker(idx) {
-            if (markers[idx]) {
-                var newStrings = [];
-                for (var i = 0; i < strings.length; i++) {
-                    if (strings[i].from !== idx && strings[i].to !== idx) {
-                        newStrings.push(strings[i]);
-                    }
-                }
-                strings = newStrings;
-                for (var i = 0; i < strings.length; i++) {
-                    if (strings[i].from > idx) strings[i].from--;
-                    if (strings[i].to > idx) strings[i].to--;
-                }
-                map.removeLayer(markers[idx].marker);
-                markers.splice(idx, 1);
-                for (var i = 0; i < markers.length; i++) updateMarkerIcon(i);
-                updatePointCount();
-                updateStringCount();
-                drawAllStrings();
-                saveToCSharp();
+        function updateMarkerIconById(pointId) {
+            var point = findMarkerById(pointId);
+            if (!point) return;
+
+            var show = document.getElementById('showLabels').checked;
+            var statusIcon = '';
+            if (point.status === 'visited') statusIcon = '✅ ';
+            else if (point.status === 'planned') statusIcon = '📅 ';
+            else statusIcon = '⭐ ';
+
+            var label = '';
+            if (show && point.title) {
+                label = '<div style="text-align:center;font-size:' + globalLabelFontSize + 'px;color:' + globalLabelColor + ';font-weight:bold;text-shadow:1px 1px 2px rgba(0,0,0,0.5);margin-top:2px;white-space:nowrap;">' + statusIcon + escapeHtml(point.title) + '</div>';
             }
+
+            var newIcon = L.divIcon({
+                html: '<div style="text-align:center;line-height:1;">' +
+                    '<div style="font-size:' + point.iconSize + 'px;color:' + point.iconColor + ';text-shadow:0 1px 2px rgba(0,0,0,0.3);cursor:pointer;display:inline-block;">' + point.iconEmoji + '</div>' +
+                    label +
+                    '</div>',
+                iconSize: [point.iconSize + 10, point.iconSize + 30],
+                popupAnchor: [0, -point.iconSize / 2],
+                className: 'custom-marker'
+            });
+
+            point.marker.setIcon(newIcon);
+
+            var statusText = '';
+            if (point.status === 'visited') statusText = '✅ Посещено';
+            else if (point.status === 'planned') statusText = '📅 Запланировано';
+            else statusText = '⭐ Хочу посетить';
+
+            var popup = '<b>' + escapeHtml(point.title) + '</b><br/>📍 ' + point.lat.toFixed(5) + ', ' + point.lng.toFixed(5) + '<br/>📌 ' + statusText;
+            if (point.visitDate) popup += '<br/>📅 ' + point.visitDate;
+            if (point.description) popup += '<br/>📖 ' + point.description;
+            if (point.photoUrl) popup += '<br/><img src="' + point.photoUrl + '" style="max-width:150px;max-height:100px;border-radius:8px;margin-top:5px;" />';
+            popup += '<br/><button onclick="openEditModal(' + point.id + ')">✏️ Редактировать</button> <button onclick="removeMarker(' + point.id + ')">🗑️ Удалить</button>';
+            point.marker.bindPopup(popup);
+        }
+
+        function removeMarker(pointId) {
+            var index = findMarkerIndexById(pointId);
+            if (index === -1) return;
+
+            var newStrings = [];
+            for (var i = 0; i < strings.length; i++) {
+                if (strings[i].fromId !== pointId && strings[i].toId !== pointId) {
+                    newStrings.push(strings[i]);
+                }
+            }
+            strings = newStrings;
+
+            if (markers[index] && markers[index].marker) {
+                map.removeLayer(markers[index].marker);
+            }
+            markers.splice(index, 1);
+
+            updatePointCount();
+            updateStringCount();
+            drawAllStrings();
+            saveToCSharp();
         }
 
         function addMarkerAtCurrentPosition() {
@@ -1654,7 +1715,6 @@
             if (title && title !== '') addMarker(c.lat, c.lng, title);
         }
 
-        // Для программной очистки (без подтверждения)
         function clearAllMarkersSilent() {
             for (var i = 0; i < markers.length; i++) {
                 if (markers[i] && markers[i].marker) {
@@ -1674,7 +1734,6 @@
             drawAllStrings();
         }
 
-        // Обычная очистка с подтверждением (для кнопки в меню)
         function clearAllMarkers() {
             if (markers.length > 0 && confirm('Удалить все места?')) {
                 clearAllMarkersSilent();
@@ -1689,28 +1748,29 @@
             }
         }
 
-
-
         function showPointsList() {
             var container = document.getElementById('pointsListContainer');
             if (!container) return;
             container.innerHTML = '';
+
             if (markers.length === 0) {
                 container.innerHTML = '<div style="text-align:center;padding:20px;color:#a0aec0;">Нет добавленных мест</div>';
                 document.getElementById('pointsListModal').style.display = 'block';
                 return;
             }
+
             for (var i = 0; i < markers.length; i++) {
                 var p = markers[i];
                 var statusText = '';
                 if (p.status === 'visited') statusText = '✅ Посещено';
                 else if (p.status === 'planned') statusText = '📅 Запланировано';
                 else statusText = '⭐ Хочу посетить';
+
                 var div = document.createElement('div');
                 div.className = 'point-list-item';
                 var infoHtml = '<div class="point-list-info"><div class="point-list-icon">' + p.iconEmoji + '</div><div><div class="point-list-title">' + escapeHtml(p.title) + '</div><div class="point-list-status">' + statusText;
                 if (p.visitDate) infoHtml += ' • ' + p.visitDate;
-                infoHtml += '</div></div></div><div class="point-list-actions"><button onclick="focusOnPoint(' + i + ')" class="primary" style="background:#667eea;">🎯 Центрировать</button><button onclick="openEditModal(' + i + ')" style="background:#48bb78;">✏️</button><button onclick="removeMarker(' + i + ')" class="danger" style="background:#e53e3e;">🗑️</button></div>';
+                infoHtml += '</div></div></div><div class="point-list-actions"><button onclick="focusOnPoint(' + p.id + ')" class="primary" style="background:#667eea;">🎯 Центрировать</button><button onclick="openEditModal(' + p.id + ')" style="background:#48bb78;">✏️</button><button onclick="removeMarker(' + p.id + ')" class="danger" style="background:#e53e3e;">🗑️</button></div>';
                 div.innerHTML = infoHtml;
                 container.appendChild(div);
             }
@@ -1721,10 +1781,11 @@
             document.getElementById('pointsListModal').style.display = 'none';
         }
 
-        function focusOnPoint(idx) {
-            if (markers[idx]) {
-                map.setView([markers[idx].lat, markers[idx].lng], 12);
-                markers[idx].marker.openPopup();
+        function focusOnPoint(pointId) {
+            var point = findMarkerById(pointId);
+            if (point) {
+                map.setView([point.lat, point.lng], 12);
+                point.marker.openPopup();
                 closePointsListModal();
             }
         }
@@ -1738,16 +1799,19 @@
             var toSel = document.getElementById('toPointSelect');
             fromSel.innerHTML = '';
             toSel.innerHTML = '';
+
             for (var i = 0; i < markers.length; i++) {
                 var opt1 = document.createElement('option');
-                opt1.value = i;
+                opt1.value = markers[i].id;  // ✅ ИСПРАВЛЕНО: используем ID, а не i
                 opt1.text = markers[i].title;
                 fromSel.appendChild(opt1);
+
                 var opt2 = document.createElement('option');
-                opt2.value = i;
+                opt2.value = markers[i].id;  // ✅ ИСПРАВЛЕНО: используем ID, а не i
                 opt2.text = markers[i].title;
                 toSel.appendChild(opt2);
             }
+
             if (markers.length > 1) toSel.selectedIndex = 1;
             document.getElementById('connectionDescription').value = '';
             document.getElementById('stringWidth').value = '2';
@@ -1761,51 +1825,62 @@
             document.getElementById('connectionModal').style.display = 'none';
         }
 
-        function addConnection() {
-            var fromIdx = parseInt(document.getElementById('fromPointSelect').value, 10);
-            var toIdx = parseInt(document.getElementById('toPointSelect').value, 10);
+        function addConnectionSave() {
+            var fromId = parseInt(document.getElementById('fromPointSelect').value, 10);
+            var toId = parseInt(document.getElementById('toPointSelect').value, 10);
             var desc = document.getElementById('connectionDescription').value;
             var color = stringColor;
             var width = stringWidth;
-            if (fromIdx === toIdx) {
+
+            console.log('=== addConnectionSave ===');
+            console.log('fromId:', fromId, 'toId:', toId);
+
+            if (fromId === toId) {
                 alert('Нельзя соединить место с самим собой');
                 return;
             }
+
             var exists = false;
             for (var i = 0; i < strings.length; i++) {
-                if ((strings[i].from === fromIdx && strings[i].to === toIdx) || (strings[i].from === toIdx && strings[i].to === fromIdx)) {
+                if ((strings[i].fromId === fromId && strings[i].toId === toId) ||
+                    (strings[i].fromId === toId && strings[i].toId === fromId)) {
                     exists = true;
                     break;
                 }
             }
+
             if (exists) {
                 alert('Такая связь уже есть');
                 return;
             }
-            strings.push({ from: fromIdx, to: toIdx, description: desc, color: color, width: width });
+
+            strings.push({ fromId: fromId, toId: toId, description: desc, color: color, width: width });
+            console.log('Strings after push:', strings.length);
+            console.log('String added:', strings[strings.length - 1]);
+
             updateStringCount();
             drawAllStrings();
             saveToCSharp();
             closeConnectionModal();
         }
 
-
-
-        // Управление соединениями
         function showConnectionsList() {
             var container = document.getElementById('connectionsListContainer');
             if (!container) return;
             container.innerHTML = '';
+
             if (strings.length === 0) {
                 container.innerHTML = '<div style="text-align:center;padding:20px;color:#a0aec0;">Нет добавленных связей</div>';
                 document.getElementById('connectionsListModal').style.display = 'block';
                 return;
             }
+
             for (var i = 0; i < strings.length; i++) {
                 var s = strings[i];
-                var fromPoint = markers[s.from];
-                var toPoint = markers[s.to];
+                var fromPoint = findMarkerById(s.fromId);
+                var toPoint = findMarkerById(s.toId);
                 if (!fromPoint || !toPoint) continue;
+
                 var div = document.createElement('div');
                 div.className = 'point-list-item';
                 var infoHtml = '<div class="point-list-info">' +
@@ -1840,15 +1915,15 @@
 
             for (var i = 0; i < markers.length; i++) {
                 var opt1 = document.createElement('option');
-                opt1.value = i;
+                opt1.value = markers[i].id;
                 opt1.text = markers[i].title;
-                if (i === s.from) opt1.selected = true;
+                if (markers[i].id === s.fromId) opt1.selected = true;
                 fromSel.appendChild(opt1);
 
                 var opt2 = document.createElement('option');
-                opt2.value = i;
+                opt2.value = markers[i].id;
                 opt2.text = markers[i].title;
-                if (i === s.to) opt2.selected = true;
+                if (markers[i].id === s.toId) opt2.selected = true;
                 toSel.appendChild(opt2);
             }
 
@@ -1881,18 +1956,18 @@
 
         function saveConnectionEdit() {
             if (currentEditingConnectionIndex >= 0) {
-                var fromIdx = parseInt(document.getElementById('editFromPointSelect').value, 10);
-                var toIdx = parseInt(document.getElementById('editToPointSelect').value, 10);
+                var fromId = parseInt(document.getElementById('editFromPointSelect').value, 10);
+                var toId = parseInt(document.getElementById('editToPointSelect').value, 10);
                 var desc = document.getElementById('editConnectionDescription').value;
 
-                if (fromIdx === toIdx) {
+                if (fromId === toId) {
                     alert('Нельзя соединить место с самим собой');
                     return;
                 }
 
                 strings[currentEditingConnectionIndex] = {
-                    from: fromIdx,
-                    to: toIdx,
+                    fromId: fromId,
+                    toId: toId,
                     description: desc,
                     color: editStringColor,
                     width: editStringWidth
@@ -1943,6 +2018,7 @@
             try {
                 if (window.external && window.external.NotifyPointsChanged) {
                     var data = exportPoints();
+                    console.log('Saving data:', data);
                     if (typeof data === 'string') {
                         window.external.NotifyPointsChanged(data);
                     } else {
@@ -1956,9 +2032,14 @@
 
         function exportPoints() {
             try {
+                console.log('=== exportPoints called ===');
+                console.log('Markers count:', markers.length);
+                console.log('Strings count:', strings.length);
+
                 var pointsArr = [];
                 for (var i = 0; i < markers.length; i++) {
                     pointsArr.push({
+                        Id: markers[i].id,
                         Latitude: markers[i].lat,
                         Longitude: markers[i].lng,
                         Title: markers[i].title,
@@ -1973,12 +2054,12 @@
                     });
                 }
 
-                // ВАЖНО: экспортируем ТОЛЬКО текущие связи (с индексами 0,1,2...)
                 var currentStrings = [];
                 for (var i = 0; i < strings.length; i++) {
+                    console.log('String', i, 'fromId:', strings[i].fromId, 'toId:', strings[i].toId);
                     currentStrings.push({
-                        From: strings[i].from,
-                        To: strings[i].to,
+                        FromId: strings[i].fromId,
+                        ToId: strings[i].toId,
                         Description: strings[i].description || '',
                         Color: strings[i].color || '#ed8936',
                         Width: strings[i].width || 2
@@ -1986,7 +2067,7 @@
                 }
 
                 var result = JSON.stringify({ points: pointsArr, strings: currentStrings });
-                console.log('Exporting strings count:', currentStrings.length);
+                console.log('Export result strings count:', currentStrings.length);
                 return result;
             } catch (error) {
                 console.error('Error in exportPoints:', error);
@@ -2003,47 +2084,38 @@
                 var pts = parsed.points || parsed;
                 var strs = parsed.strings || [];
 
-                // ВАЖНО: полностью очищаем глобальные массивы
-                if (typeof clearAllMarkersSilent === 'function') {
-                    clearAllMarkersSilent();
-                } else {
-                    // Очищаем вручную
-                    for (var i = 0; i < markers.length; i++) {
-                        if (markers[i] && markers[i].marker) {
-                            map.removeLayer(markers[i].marker);
-                        }
+                for (var i = 0; i < markers.length; i++) {
+                    if (markers[i] && markers[i].marker) {
+                        map.removeLayer(markers[i].marker);
                     }
-                    markers = [];
-                    strings = [];
                 }
+                markers = [];
+                strings = [];
 
-                // Добавляем точки
                 for (var i = 0; i < pts.length; i++) {
                     var p = pts[i];
-                    if (typeof addMarker === 'function') {
-                        addMarker(
-                            parseFloat(p.Latitude || 0),
-                            parseFloat(p.Longitude || 0),
-                            p.Title || 'New place',
-                            p.IconEmoji || '📍',
-                            p.Description || '',
-                            p.IconColor || '#e2e8f0',
-                            parseInt(p.IconSize || 36),
-                            p.Status || 'planned',
-                            p.PhotoUrl || '',
-                            p.VisitDate || ''
-                        );
-                    }
+                    // Передаём ID как есть (может быть отрицательным)
+                    addMarker(
+                        parseFloat(p.Latitude || 0),
+                        parseFloat(p.Longitude || 0),
+                        p.Title || 'New place',
+                        p.IconEmoji || '📍',
+                        p.Description || '',
+                        p.IconColor || '#e2e8f0',
+                        parseInt(p.IconSize || 36),
+                        p.Status || 'planned',
+                        p.PhotoUrl || '',
+                        p.VisitDate || '',
+                        p.Id || 0  // Отрицательные ID остаются отрицательными
+                    );
                 }
 
-                // ВАЖНО: полностью заменяем связи, а не добавляем
                 strings = [];
                 for (var i = 0; i < strs.length; i++) {
                     var s = strs[i];
-                    // Используем индексы из загруженных данных (они должны быть 0,1,2...)
                     strings.push({
-                        from: s.From !== undefined ? s.From : s.from,
-                        to: s.To !== undefined ? s.To : s.to,
+                        fromId: s.FromId !== undefined ? s.FromId : s.fromId,
+                        toId: s.ToId !== undefined ? s.ToId : s.toId,
                         description: s.Description || s.description || '',
                         color: s.Color || s.color || '#ed8936',
                         width: s.Width || s.width || 2
@@ -2061,7 +2133,7 @@
                     map.fitBounds(L.latLngBounds(bounds));
                 }
 
-                console.log('Points loaded successfully, strings:', strings.length);
+                console.log('Points loaded successfully, strings with IDs:', strings.length);
             } catch (e) {
                 console.error('Error loading points:', e);
             }
@@ -2091,6 +2163,7 @@
         window.showConnectionsList = showConnectionsList;
         window.editConnection = editConnection;
         window.removeConnection = removeConnection;
+        window.addConnectionSave = addConnectionSave;
     </script>
 </body>
 </html>

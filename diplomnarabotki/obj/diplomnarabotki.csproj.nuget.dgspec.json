@@ -1,17 +1,17 @@
 {
   "format": 1,
   "restore": {
-    "C:\\Users\\Msi\\source\\repos\\diplommvvm\\diplomnarabotki\\diplomnarabotki.csproj": {}
+    "C:\\Users\\Msi\\source\\repos\\diplomForCheck\\diplomnarabotki\\diplomnarabotki.csproj": {}
   },
   "projects": {
-    "C:\\Users\\Msi\\source\\repos\\diplommvvm\\diplomnarabotki\\diplomnarabotki.csproj": {
+    "C:\\Users\\Msi\\source\\repos\\diplomForCheck\\diplomnarabotki\\diplomnarabotki.csproj": {
       "version": "1.0.0",
       "restore": {
-        "projectUniqueName": "C:\\Users\\Msi\\source\\repos\\diplommvvm\\diplomnarabotki\\diplomnarabotki.csproj",
+        "projectUniqueName": "C:\\Users\\Msi\\source\\repos\\diplomForCheck\\diplomnarabotki\\diplomnarabotki.csproj",
         "projectName": "diplomnarabotki",
-        "projectPath": "C:\\Users\\Msi\\source\\repos\\diplommvvm\\diplomnarabotki\\diplomnarabotki.csproj",
+        "projectPath": "C:\\Users\\Msi\\source\\repos\\diplomForCheck\\diplomnarabotki\\diplomnarabotki.csproj",
         "packagesPath": "C:\\Users\\Msi\\.nuget\\packages\\",
-        "outputPath": "C:\\Users\\Msi\\source\\repos\\diplommvvm\\diplomnarabotki\\obj\\",
+        "outputPath": "C:\\Users\\Msi\\source\\repos\\diplomForCheck\\diplomnarabotki\\obj\\",
         "projectStyle": "PackageReference",
         "fallbackFolders": [
           "C:\\Program Files (x86)\\Microsoft Visual Studio\\Shared\\NuGetPackages"

@@ -190,11 +190,11 @@ namespace diplomnarabotki.Views
                 var simplePoints = new List<object>();
                 foreach (var point in _currentTravel.RoutePoints)
                 {
-                    // Для отображения на карте используем PhotoUrl (base64) или пустую строку
                     string displayPhoto = point.PhotoUrl ?? "";
 
                     simplePoints.Add(new
                     {
+                        Id = point.Id,  // ✅ ЭТО САМОЕ ВАЖНОЕ - ДОБАВЬ!
                         Latitude = point.Latitude,
                         Longitude = point.Longitude,
                         Title = point.Title ?? "Place",
@@ -305,76 +305,80 @@ namespace diplomnarabotki.Views
 
                 if (wrapper?.Points != null)
                 {
-                    // Сохраняем фото и обновляем пути
+                    // Создаём словарь существующих точек для быстрого поиска
+                    var existingPointsDict = _currentTravel.RoutePoints.ToDictionary(p => p.Id);
+                    var updatedPointIds = new HashSet<int>();
+
                     for (int i = 0; i < wrapper.Points.Count; i++)
                     {
-                        var point = wrapper.Points[i];
+                        var incomingPoint = wrapper.Points[i];
 
-                        // Проверяем, есть ли новое фото в base64
-                        if (!string.IsNullOrEmpty(point.PhotoUrl) && point.PhotoUrl.StartsWith("data:image"))
+                        // Обработка фото
+                        if (!string.IsNullOrEmpty(incomingPoint.PhotoUrl) && incomingPoint.PhotoUrl.StartsWith("data:image"))
                         {
-                            // Удаляем старое фото, если оно было
-                            var oldPoint = _currentTravel.RoutePoints.FirstOrDefault(p => p.Id == point.Id);
-                            if (oldPoint != null && !string.IsNullOrEmpty(oldPoint.StoredPhotoPath) && oldPoint.StoredPhotoPath.StartsWith("Photos/"))
+                            var oldPoint = existingPointsDict.Values.FirstOrDefault(p => p.Id == incomingPoint.Id);
+                            if (oldPoint != null && !string.IsNullOrEmpty(oldPoint.StoredPhotoPath))
                             {
                                 _photoService.DeletePhoto(oldPoint.StoredPhotoPath);
                             }
 
-                            // Сохраняем новое фото
-                            var photoPath = await _photoService.SavePhotoAsync(
-                                point.PhotoUrl,
-                                _currentTravel.Id.ToString(),
-                                i.ToString()
-                            );
+                            var photoPath = await _photoService.SavePhotoAsync(incomingPoint.PhotoUrl, _currentTravel.Id.ToString(), i.ToString());
+                            incomingPoint.StoredPhotoPath = photoPath;
+                            incomingPoint.PhotoUrl = "";
+                        }
 
-                            // Сохраняем путь в StoredPhotoPath, а PhotoUrl оставляем для отображения
-                            point.StoredPhotoPath = photoPath;
-                            point.PhotoUrl = ""; // Очищаем base64, т.к. он больше не нужен
-                        }
-                        else if (string.IsNullOrEmpty(point.PhotoUrl) && !string.IsNullOrEmpty(point.StoredPhotoPath))
+                        if (existingPointsDict.ContainsKey(incomingPoint.Id) && incomingPoint.Id > 0)
                         {
-                            // Если фото удалено, удаляем файл
-                            var oldPoint = _currentTravel.RoutePoints.FirstOrDefault(p => p.Id == point.Id);
-                            if (oldPoint != null && !string.IsNullOrEmpty(oldPoint.StoredPhotoPath) && oldPoint.StoredPhotoPath.StartsWith("Photos/"))
-                            {
-                                _photoService.DeletePhoto(oldPoint.StoredPhotoPath);
-                            }
-                            point.StoredPhotoPath = "";
+                            // Обновляем существующую точку
+                            var existingPoint = existingPointsDict[incomingPoint.Id];
+                            existingPoint.Latitude = incomingPoint.Latitude;
+                            existingPoint.Longitude = incomingPoint.Longitude;
+                            existingPoint.Title = incomingPoint.Title;
+                            existingPoint.IconEmoji = incomingPoint.IconEmoji;
+                            existingPoint.Description = incomingPoint.Description;
+                            existingPoint.IconColor = incomingPoint.IconColor;
+                            existingPoint.IconSize = incomingPoint.IconSize;
+                            existingPoint.Status = incomingPoint.Status;
+                            existingPoint.VisitDate = incomingPoint.VisitDate;
+                            existingPoint.Order = i;
+                            if (!string.IsNullOrEmpty(incomingPoint.StoredPhotoPath))
+                                existingPoint.StoredPhotoPath = incomingPoint.StoredPhotoPath;
+
+                            updatedPointIds.Add(existingPoint.Id);
                         }
-                        else if (!string.IsNullOrEmpty(point.StoredPhotoPath))
+                        else
                         {
-                            // Фото не менялось, сохраняем существующий путь
-                            point.PhotoUrl = ""; // Очищаем base64, если он был
+                            // Новая точка
+                            incomingPoint.Id = 0;
+                            incomingPoint.Order = i;
+                            _currentTravel.RoutePoints.Add(incomingPoint);
+                            updatedPointIds.Add(incomingPoint.Id);
                         }
                     }
 
-                    // Обновляем точки
-                    _currentTravel.RoutePoints = wrapper.Points;
+                    // Удаляем точки, которых больше нет
+                    var pointsToRemove = _currentTravel.RoutePoints.Where(p => p.Id > 0 && !updatedPointIds.Contains(p.Id)).ToList();
+                    foreach (var point in pointsToRemove)
+                    {
+                        if (!string.IsNullOrEmpty(point.StoredPhotoPath))
+                            _photoService.DeletePhoto(point.StoredPhotoPath);
+                        _currentTravel.RoutePoints.Remove(point);
+                    }
                 }
 
                 if (wrapper?.Strings != null)
                 {
-                    _currentTravel.TravelStrings = new ObservableCollection<TravelStringViewModel>();
-
-                    var indexToId = new Dictionary<int, int>();
-                    for (int i = 0; i < _currentTravel.RoutePoints.Count; i++)
-                    {
-                        indexToId[i] = _currentTravel.RoutePoints[i].Id;
-                    }
-
+                    _currentTravel.TravelStrings.Clear();
                     foreach (var travelString in wrapper.Strings)
                     {
-                        if (indexToId.ContainsKey(travelString.From) && indexToId.ContainsKey(travelString.To))
+                        _currentTravel.TravelStrings.Add(new TravelStringViewModel
                         {
-                            _currentTravel.TravelStrings.Add(new TravelStringViewModel
-                            {
-                                From = indexToId[travelString.From],
-                                To = indexToId[travelString.To],
-                                Description = travelString.Description ?? "",
-                                Color = travelString.Color ?? "#ed8936",
-                                Width = travelString.Width > 0 ? travelString.Width : 2
-                            });
-                        }
+                            From = travelString.From,
+                            To = travelString.To,
+                            Description = travelString.Description ?? "",
+                            Color = travelString.Color ?? "#ed8936",
+                            Width = travelString.Width > 0 ? travelString.Width : 2
+                        });
                     }
                 }
 
@@ -500,8 +504,12 @@ namespace diplomnarabotki.Views
 
         public class TravelStringContract
         {
+            [System.Text.Json.Serialization.JsonPropertyName("FromId")]
             public int From { get; set; }
+
+            [System.Text.Json.Serialization.JsonPropertyName("ToId")]
             public int To { get; set; }
+
             public string Description { get; set; } = "";
             public string Color { get; set; } = "#ed8936";
             public double Width { get; set; } = 2;

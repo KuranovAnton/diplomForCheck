@@ -341,11 +341,6 @@ C:\Users\Msi\Desktop\DiplomNarabotki\diplomnarabotki\obj\Debug\net10.0-windows\d
 C:\Users\Msi\Desktop\DiplomNarabotki\diplomnarabotki\obj\Debug\net10.0-windows\diplomnarabotki.genruntimeconfig.cache
 C:\Users\Msi\Desktop\DiplomNarabotki\diplomnarabotki\obj\Debug\net10.0-windows\ref\diplomnarabotki.dll
 C:\Users\Msi\source\repos\diplomForCheck\diplomnarabotki\obj\Debug\net10.0-windows\diplomnarabotki.csproj.AssemblyReference.cache
-C:\Users\Msi\source\repos\diplomForCheck\diplomnarabotki\obj\Debug\net10.0-windows\CreateTravelDialog.baml
-C:\Users\Msi\source\repos\diplomForCheck\diplomnarabotki\obj\Debug\net10.0-windows\MapPage.baml
-C:\Users\Msi\source\repos\diplomForCheck\diplomnarabotki\obj\Debug\net10.0-windows\CreateTravelDialog.g.cs
-C:\Users\Msi\source\repos\diplomForCheck\diplomnarabotki\obj\Debug\net10.0-windows\MapPage.g.cs
-C:\Users\Msi\source\repos\diplomForCheck\diplomnarabotki\obj\Debug\net10.0-windows\Planer.g.cs
 C:\Users\Msi\source\repos\diplomForCheck\diplomnarabotki\obj\Debug\net10.0-windows\App.g.cs
 C:\Users\Msi\source\repos\diplomForCheck\diplomnarabotki\obj\Debug\net10.0-windows\diplomnarabotki_Content.g.cs
 C:\Users\Msi\source\repos\diplomForCheck\diplomnarabotki\obj\Debug\net10.0-windows\GeneratedInternalTypeHelper.g.cs
@@ -564,7 +559,6 @@ C:\Users\Msi\source\repos\diplomForCheck\diplomnarabotki\bin\Debug\net10.0-windo
 C:\Users\Msi\source\repos\diplomForCheck\diplomnarabotki\bin\Debug\net10.0-windows\runtimes\win-arm64\native\e_sqlite3.dll
 C:\Users\Msi\source\repos\diplomForCheck\diplomnarabotki\bin\Debug\net10.0-windows\runtimes\win-x64\native\e_sqlite3.dll
 C:\Users\Msi\source\repos\diplomForCheck\diplomnarabotki\bin\Debug\net10.0-windows\runtimes\win-x86\native\e_sqlite3.dll
-C:\Users\Msi\source\repos\diplomForCheck\diplomnarabotki\obj\Debug\net10.0-windows\Planer.baml
 C:\Users\Msi\source\repos\diplomForCheck\diplomnarabotki\obj\Debug\net10.0-windows\diplomnarabotki.g.resources
 C:\Users\Msi\source\repos\diplomForCheck\diplomnarabotki\obj\Debug\net10.0-windows\diplomnarabotki.GeneratedMSBuildEditorConfig.editorconfig
 C:\Users\Msi\source\repos\diplomForCheck\diplomnarabotki\obj\Debug\net10.0-windows\diplomnarabotki.AssemblyInfoInputs.cache
@@ -814,3 +808,9 @@ C:\Users\Msi\source\repos\diplommvvm\diplomnarabotki\obj\Debug\net10.0-windows\r
 C:\Users\Msi\source\repos\diplommvvm\diplomnarabotki\obj\Debug\net10.0-windows\diplomnarabotki.pdb
 C:\Users\Msi\source\repos\diplommvvm\diplomnarabotki\obj\Debug\net10.0-windows\diplomnarabotki.genruntimeconfig.cache
 C:\Users\Msi\source\repos\diplommvvm\diplomnarabotki\obj\Debug\net10.0-windows\ref\diplomnarabotki.dll
+C:\Users\Msi\source\repos\diplomForCheck\diplomnarabotki\obj\Debug\net10.0-windows\Views\CreateTravelDialog.baml
+C:\Users\Msi\source\repos\diplomForCheck\diplomnarabotki\obj\Debug\net10.0-windows\Views\MapPage.baml
+C:\Users\Msi\source\repos\diplomForCheck\diplomnarabotki\obj\Debug\net10.0-windows\Views\CreateTravelDialog.g.cs
+C:\Users\Msi\source\repos\diplomForCheck\diplomnarabotki\obj\Debug\net10.0-windows\Views\MapPage.g.cs
+C:\Users\Msi\source\repos\diplomForCheck\diplomnarabotki\obj\Debug\net10.0-windows\Views\Planer.g.cs
+C:\Users\Msi\source\repos\diplomForCheck\diplomnarabotki\obj\Debug\net10.0-windows\Views\Planer.baml

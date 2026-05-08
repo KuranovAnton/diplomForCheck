@@ -416,15 +416,7 @@ namespace diplomnarabotki.Services
             existing.Route = updated.Route;
             existing.UpdatedAt = DateTime.Now;
 
-            // Очищаем старые связи между точками
-            var oldStrings = existing.TravelStrings.ToList();
-            _context.TravelStrings.RemoveRange(oldStrings);
-
-            // Очищаем старые точки
-            var oldPoints = existing.RoutePoints.ToList();
-            _context.RoutePoints.RemoveRange(oldPoints);
-
-            // Очищаем старые заметки и закрепления
+            // ========== 1. ОБНОВЛЯЕМ ЗАМЕТКИ ==========
             var oldPinnedNotes = existing.PinnedNotes.ToList();
             _context.PinnedNotes.RemoveRange(oldPinnedNotes);
 
@@ -480,7 +472,6 @@ namespace diplomnarabotki.Services
                 newNotes.Add(noteEntity);
             }
 
-            // Сохраняем заметки
             await _context.SaveChangesAsync();
 
             // Создаём новые закрепленные заметки
@@ -501,100 +492,164 @@ namespace diplomnarabotki.Services
                 }
             }
 
-            // Создаём новые точки маршрута с сохранением фото
-            var oldToNewIdMap = new Dictionary<int, int>();
+            // ========== 2. ОБНОВЛЯЕМ ТОЧКИ ==========
+            var existingPointsDict = existing.RoutePoints.ToDictionary(p => p.Id);
+            var updatedPointIds = new HashSet<int>();
             int pointOrder = 0;
 
             foreach (var point in updated.RoutePoints)
             {
-                string photoPath = point.StoredPhotoPath ?? "";
-
-                // Если есть новое фото в base64, сохраняем его в файл
-                if (!string.IsNullOrEmpty(point.PhotoUrl) && point.PhotoUrl.StartsWith("data:image"))
+                if (point.Id > 0 && existingPointsDict.ContainsKey(point.Id))
                 {
-                    // Удаляем старое фото, если оно было
-                    if (!string.IsNullOrEmpty(point.StoredPhotoPath) && point.StoredPhotoPath.StartsWith("Photos/"))
+                    // Обновляем существующую точку
+                    var existingPoint = existingPointsDict[point.Id];
+                    existingPoint.Latitude = point.Latitude;
+                    existingPoint.Longitude = point.Longitude;
+                    existingPoint.Title = point.Title;
+                    existingPoint.Order = pointOrder;
+                    existingPoint.IconEmoji = point.IconEmoji;
+                    existingPoint.IconType = point.IconType;
+                    existingPoint.Description = point.Description;
+                    existingPoint.IconColor = point.IconColor;
+                    existingPoint.IconSize = point.IconSize;
+                    existingPoint.Status = point.Status;
+                    existingPoint.VisitDate = point.VisitDate;
+
+                    // Обновляем фото
+                    if (!string.IsNullOrEmpty(point.PhotoUrl) && point.PhotoUrl.StartsWith("data:image"))
                     {
-                        _photoService.DeletePhoto(point.StoredPhotoPath);
+                        if (!string.IsNullOrEmpty(existingPoint.PhotoUrl) && existingPoint.PhotoUrl.StartsWith("Photos/"))
+                            _photoService.DeletePhoto(existingPoint.PhotoUrl);
+
+                        var photoPath = await _photoService.SavePhotoAsync(point.PhotoUrl, existing.Id.ToString(), pointOrder.ToString());
+                        existingPoint.PhotoUrl = photoPath;
+                        point.PhotoUrl = "";
+                        point.StoredPhotoPath = photoPath;
+                    }
+                    else if (string.IsNullOrEmpty(point.PhotoUrl) && !string.IsNullOrEmpty(existingPoint.PhotoUrl))
+                    {
+                        if (existingPoint.PhotoUrl.StartsWith("Photos/"))
+                            _photoService.DeletePhoto(existingPoint.PhotoUrl);
+                        existingPoint.PhotoUrl = "";
+                        point.StoredPhotoPath = "";
                     }
 
-                    // Сохраняем новое фото
-                    photoPath = await _photoService.SavePhotoAsync(
-                        point.PhotoUrl,
-                        existing.Id.ToString(),
-                        pointOrder.ToString()
-                    );
+                    updatedPointIds.Add(existingPoint.Id);
                 }
-                else if (string.IsNullOrEmpty(point.PhotoUrl) && !string.IsNullOrEmpty(point.StoredPhotoPath))
+                else
                 {
-                    // Фото было удалено, удаляем файл
-                    if (point.StoredPhotoPath.StartsWith("Photos/"))
+                    // Добавляем новую точку
+                    string photoPath = "";
+                    if (!string.IsNullOrEmpty(point.PhotoUrl) && point.PhotoUrl.StartsWith("data:image"))
                     {
-                        _photoService.DeletePhoto(point.StoredPhotoPath);
+                        photoPath = await _photoService.SavePhotoAsync(point.PhotoUrl, existing.Id.ToString(), pointOrder.ToString());
+                        point.PhotoUrl = "";
+                        point.StoredPhotoPath = photoPath;
                     }
-                    photoPath = "";
-                }
 
-                var pointEntity = new RoutePointEntity
-                {
-                    TravelId = existing.Id,
-                    Latitude = point.Latitude,
-                    Longitude = point.Longitude,
-                    Title = point.Title,
-                    Order = pointOrder++,
-                    IconEmoji = point.IconEmoji,
-                    IconType = point.IconType,
-                    Description = point.Description,
-                    IconColor = point.IconColor,
-                    IconSize = point.IconSize,
-                    Status = point.Status,
-                    PhotoUrl = photoPath, // Сохраняем путь к файлу
-                    VisitDate = point.VisitDate
-                };
-                existing.RoutePoints.Add(pointEntity);
+                    var newPoint = new RoutePointEntity
+                    {
+                        TravelId = existing.Id,
+                        Latitude = point.Latitude,
+                        Longitude = point.Longitude,
+                        Title = point.Title,
+                        Order = pointOrder,
+                        IconEmoji = point.IconEmoji,
+                        IconType = point.IconType,
+                        Description = point.Description,
+                        IconColor = point.IconColor,
+                        IconSize = point.IconSize,
+                        Status = point.Status,
+                        PhotoUrl = photoPath,
+                        VisitDate = point.VisitDate
+                    };
+                    existing.RoutePoints.Add(newPoint);
+
+                    await _context.SaveChangesAsync();
+                    point.Id = newPoint.Id;
+                    updatedPointIds.Add(newPoint.Id);
+                }
+                pointOrder++;
             }
 
-            // Сохраняем точки, чтобы получить новые ID
+            // Удаляем точки, которых больше нет
+            var pointsToDelete = existing.RoutePoints.Where(p => !updatedPointIds.Contains(p.Id)).ToList();
+            foreach (var pointToDelete in pointsToDelete)
+            {
+                if (!string.IsNullOrEmpty(pointToDelete.PhotoUrl) && pointToDelete.PhotoUrl.StartsWith("Photos/"))
+                    _photoService.DeletePhoto(pointToDelete.PhotoUrl);
+                _context.RoutePoints.Remove(pointToDelete);
+            }
+
             await _context.SaveChangesAsync();
 
-            // Заполняем карту старых ID на новые
-            var newPoints = existing.RoutePoints.OrderBy(p => p.Order).ToList();
-            var oldPointsList = updated.RoutePoints.OrderBy(p => p.Order).ToList();
+            // ========== 3. СОЗДАЁМ МАППИНГ ID И СОХРАНЯЕМ СВЯЗИ ==========
+            // Сначала сохраняем все изменения
+            await _context.SaveChangesAsync();
 
-            for (int i = 0; i < newPoints.Count && i < oldPointsList.Count; i++)
+            // Создаём словарь для маппинга старых ID (временных) на новые ID (из БД)
+            var idMapping = new Dictionary<int, int>();
+
+            // Сначала добавляем все существующие точки из updated.RoutePoints
+            foreach (var point in updated.RoutePoints)
             {
-                oldToNewIdMap[oldPointsList[i].Id] = newPoints[i].Id;
-                // Обновляем ID и путь к фото в ViewModel
-                oldPointsList[i].Id = newPoints[i].Id;
-                oldPointsList[i].StoredPhotoPath = newPoints[i].PhotoUrl;
-                // Очищаем base64 фото после сохранения
-                if (oldPointsList[i].PhotoUrl != null && oldPointsList[i].PhotoUrl.StartsWith("data:image"))
+                // Ищем точку в existing.RoutePoints по координатам и названию
+                var existingPoint = existing.RoutePoints.FirstOrDefault(p =>
+                    Math.Abs(p.Latitude - point.Latitude) < 0.000001 &&
+                    Math.Abs(p.Longitude - point.Longitude) < 0.000001 &&
+                    p.Title == point.Title);
+
+                if (existingPoint != null)
                 {
-                    oldPointsList[i].PhotoUrl = "";
+                    // Если ID изменился, добавляем в маппинг
+                    if (point.Id != existingPoint.Id)
+                    {
+                        idMapping[point.Id] = existingPoint.Id;
+                        System.Diagnostics.Debug.WriteLine($"Mapping: {point.Id} -> {existingPoint.Id}");
+                    }
+                    point.Id = existingPoint.Id;
                 }
             }
 
-            System.Diagnostics.Debug.WriteLine($"=== Saving strings to DB ===");
-            System.Diagnostics.Debug.WriteLine($"Old to New ID map: {string.Join(", ", oldToNewIdMap.Select(kvp => $"{kvp.Key}->{kvp.Value}"))}");
+            System.Diagnostics.Debug.WriteLine($"ID Mapping count: {idMapping.Count}");
+            foreach (var kvp in idMapping)
+            {
+                System.Diagnostics.Debug.WriteLine($"  {kvp.Key} -> {kvp.Value}");
+            }
 
-            // Создаём новые связи используя новые ID точек
+            // Удаляем старые связи
+            var oldTravelStrings = existing.TravelStrings.ToList();
+            _context.TravelStrings.RemoveRange(oldTravelStrings);
+            await _context.SaveChangesAsync();
+
+            // Создаём новые связи с правильными ID
             foreach (var travelString in updated.TravelStrings)
             {
-                System.Diagnostics.Debug.WriteLine($"Processing string: From={travelString.From}, To={travelString.To}");
+                int newFromId = travelString.From;
+                int newToId = travelString.To;
 
-                // Конвертируем старые ID в новые
-                int newFromId = oldToNewIdMap.ContainsKey(travelString.From) ? oldToNewIdMap[travelString.From] : travelString.From;
-                int newToId = oldToNewIdMap.ContainsKey(travelString.To) ? oldToNewIdMap[travelString.To] : travelString.To;
-
-                System.Diagnostics.Debug.WriteLine($"Converted to new IDs: From={newFromId}, To={newToId}");
-
-                // Проверяем существование точек с новыми ID
-                var fromPointExists = existing.RoutePoints.Any(p => p.Id == newFromId);
-                var toPointExists = existing.RoutePoints.Any(p => p.Id == newToId);
-
-                if (fromPointExists && toPointExists)
+                // Заменяем временные ID на настоящие
+                if (idMapping.ContainsKey(travelString.From))
                 {
-                    var stringEntity = new TravelStringEntity
+                    newFromId = idMapping[travelString.From];
+                    System.Diagnostics.Debug.WriteLine($"Remapped From: {travelString.From} -> {newFromId}");
+                }
+
+                if (idMapping.ContainsKey(travelString.To))
+                {
+                    newToId = idMapping[travelString.To];
+                    System.Diagnostics.Debug.WriteLine($"Remapped To: {travelString.To} -> {newToId}");
+                }
+
+                // Проверяем, что ID существуют
+                var fromExists = existing.RoutePoints.Any(p => p.Id == newFromId);
+                var toExists = existing.RoutePoints.Any(p => p.Id == newToId);
+
+                System.Diagnostics.Debug.WriteLine($"Creating string: From={newFromId} (exists={fromExists}), To={newToId} (exists={toExists})");
+
+                if (fromExists && toExists && newFromId != newToId)
+                {
+                    existing.TravelStrings.Add(new TravelStringEntity
                     {
                         TravelId = existing.Id,
                         FromPointId = newFromId,
@@ -602,22 +657,15 @@ namespace diplomnarabotki.Services
                         Description = travelString.Description ?? "",
                         Color = travelString.Color ?? "#ed8936",
                         Width = travelString.Width > 0 ? travelString.Width : 2
-                    };
-
-                    existing.TravelStrings.Add(stringEntity);
-                    System.Diagnostics.Debug.WriteLine($"Saved string with IDs: {newFromId} -> {newToId}");
-
-                    // Обновляем ID в ViewModel
-                    travelString.From = newFromId;
-                    travelString.To = newToId;
+                    });
+                    System.Diagnostics.Debug.WriteLine($"String added successfully!");
                 }
                 else
                 {
-                    System.Diagnostics.Debug.WriteLine($"ERROR: Points not found. FromPointExists={fromPointExists}, ToPointExists={toPointExists}");
+                    System.Diagnostics.Debug.WriteLine($"ERROR: Cannot create string. FromExists={fromExists}, ToExists={toExists}");
                 }
             }
 
-            // Финальное сохранение
             await _context.SaveChangesAsync();
             System.Diagnostics.Debug.WriteLine($"Total strings saved: {existing.TravelStrings.Count}");
         }

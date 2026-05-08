@@ -382,7 +382,7 @@ namespace diplomnarabotki.Views {
                 return;
             }
             _contentLoaded = true;
-            System.Uri resourceLocater = new System.Uri("/diplomnarabotki;V1.0.0.0;component/views/planer.xaml", System.UriKind.Relative);
+            System.Uri resourceLocater = new System.Uri("/diplomnarabotki;component/views/planer.xaml", System.UriKind.Relative);
             
             #line 1 "..\..\..\..\Views\Planer.xaml"
             System.Windows.Application.LoadComponent(this, resourceLocater);
