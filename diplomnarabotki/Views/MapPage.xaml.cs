@@ -493,15 +493,8 @@ namespace diplomnarabotki.Views
             SavePointsFromMap();
         }
 
-        private void BtnLoadPoints_Click(object sender, RoutedEventArgs e)
-        {
-            if (_currentTravel != null)
-            {
-                LoadPointsToMap();
-                MessageBox.Show("Точки загружены на карту!", "Успех",
-                    MessageBoxButton.OK, MessageBoxImage.Information);
-            }
-        }
+        // Удален метод BtnLoadPoints_Click
+        // Удален метод BtnBuildRoute_Click
 
         private async void BtnBack_Click(object sender, RoutedEventArgs e)
         {
@@ -513,46 +506,6 @@ namespace diplomnarabotki.Views
             if (NavigationService != null)
             {
                 NavigationService.GoBack();
-            }
-        }
-
-        private void BtnBuildRoute_Click(object sender, RoutedEventArgs e)
-        {
-            if (!_isMapLoaded)
-            {
-                MessageBox.Show("Карта еще не загружена, подождите...", "Информация",
-                    MessageBoxButton.OK, MessageBoxImage.Information);
-                return;
-            }
-
-            if (_currentTravel?.RoutePoints == null || _currentTravel.RoutePoints.Count < 2)
-            {
-                MessageBox.Show("Для построения маршрута нужно минимум 2 точки!",
-                    "Информация", MessageBoxButton.OK, MessageBoxImage.Information);
-                return;
-            }
-
-            try
-            {
-                WebBrowserMap.Dispatcher.Invoke(() =>
-                {
-                    try
-                    {
-                        var result = WebBrowserMap.InvokeScript("buildAndShowRoadRoute");
-                        System.Diagnostics.Debug.WriteLine("Build route invoked");
-                    }
-                    catch (Exception ex)
-                    {
-                        System.Diagnostics.Debug.WriteLine($"Error invoking route: {ex.Message}");
-                        MessageBox.Show($"Ошибка построения маршрута: {ex.Message}",
-                            "Ошибка", MessageBoxButton.OK, MessageBoxImage.Error);
-                    }
-                });
-            }
-            catch (Exception ex)
-            {
-                MessageBox.Show($"Ошибка: {ex.Message}", "Ошибка",
-                    MessageBoxButton.OK, MessageBoxImage.Error);
             }
         }
 

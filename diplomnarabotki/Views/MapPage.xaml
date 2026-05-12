@@ -34,19 +34,9 @@
 
                 <Separator Width="10"/>
 
-                <Button x:Name="BtnBuildRoute" Content="🛣️ Построить маршрут" 
-                        Click="BtnBuildRoute_Click" Width="150" Height="35" Margin="5"
-                        Background="#9C27B0" Foreground="White" BorderThickness="0"
-                        Cursor="Hand" FontWeight="Bold"/>
-
                 <Button x:Name="BtnSavePoints" Content="💾 Сохранить точки" 
                         Click="BtnSavePoints_Click" Width="130" Height="35" Margin="5"
                         Background="#4CAF50" Foreground="White" BorderThickness="0"
-                        Cursor="Hand" FontWeight="Bold"/>
-
-                <Button x:Name="BtnLoadPoints" Content="📂 Загрузить точки" 
-                        Click="BtnLoadPoints_Click" Width="130" Height="35" Margin="5"
-                        Background="#FF9800" Foreground="White" BorderThickness="0"
                         Cursor="Hand" FontWeight="Bold"/>
             </StackPanel>
         </Border>
