@@ -8,6 +8,9 @@
     <Compile Update="Views\MapPage.xaml.cs">
       <SubType>Code</SubType>
     </Compile>
+    <Compile Update="Views\MemoriesPage.xaml.cs">
+      <SubType>Code</SubType>
+    </Compile>
     <Compile Update="Views\Planer.xaml.cs">
       <SubType>Code</SubType>
     </Compile>

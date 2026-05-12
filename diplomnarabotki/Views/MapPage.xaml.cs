@@ -192,15 +192,26 @@ namespace diplomnarabotki.Views
                 {
                     string displayPhoto = "";
 
+                    System.Diagnostics.Debug.WriteLine($"=== Point {point.Id} ===");
+                    System.Diagnostics.Debug.WriteLine($"StoredPhotoPath: '{point.StoredPhotoPath}'");
+                    System.Diagnostics.Debug.WriteLine($"StoredPhotoPath is null or empty: {string.IsNullOrEmpty(point.StoredPhotoPath)}");
+
                     // Загружаем фото из файла в base64, если есть путь
                     if (!string.IsNullOrEmpty(point.StoredPhotoPath) && point.StoredPhotoPath.StartsWith("Photos/"))
                     {
+                        System.Diagnostics.Debug.WriteLine($"Loading photo from: {point.StoredPhotoPath}");
                         displayPhoto = await _photoService.LoadPhotoAsBase64Async(point.StoredPhotoPath);
+                        System.Diagnostics.Debug.WriteLine($"Loaded photo length: {displayPhoto.Length}");
                     }
                     else if (!string.IsNullOrEmpty(point.PhotoUrl) && point.PhotoUrl.StartsWith("data:image"))
                     {
-                        // Если уже base64 (для обратной совместимости)
+                        System.Diagnostics.Debug.WriteLine($"Using existing base64 from PhotoUrl");
                         displayPhoto = point.PhotoUrl;
+                        System.Diagnostics.Debug.WriteLine($"Base64 length: {displayPhoto.Length}");
+                    }
+                    else
+                    {
+                        System.Diagnostics.Debug.WriteLine($"Skipping photo - condition not met");
                     }
 
                     simplePoints.Add(new
@@ -302,6 +313,9 @@ namespace diplomnarabotki.Views
                 object result = WebBrowserMap.InvokeScript("exportPoints");
                 var pointsJson = result?.ToString();
 
+                System.Diagnostics.Debug.WriteLine("=== SavePointsFromMap ===");
+                System.Diagnostics.Debug.WriteLine($"JSON length: {pointsJson?.Length ?? 0}");
+
                 if (string.IsNullOrEmpty(pointsJson))
                 {
                     MessageBox.Show("Нет данных для сохранения", "Информация",
@@ -316,93 +330,125 @@ namespace diplomnarabotki.Views
 
                 var wrapper = JsonSerializer.Deserialize<PointsWrapper>(pointsJson, options);
 
-                if (wrapper?.Points != null)
+                if (wrapper?.Points == null)
                 {
-                    // Создаём словарь существующих точек для быстрого поиска
-                    var existingPointsDict = _currentTravel.RoutePoints.ToDictionary(p => p.Id);
-                    var updatedPointIds = new HashSet<int>();
-
-                    for (int i = 0; i < wrapper.Points.Count; i++)
-                    {
-                        var incomingPoint = wrapper.Points[i];
-
-                        // Обработка фото
-                        if (!string.IsNullOrEmpty(incomingPoint.PhotoUrl) && incomingPoint.PhotoUrl.StartsWith("data:image"))
-                        {
-                            var oldPoint = existingPointsDict.Values.FirstOrDefault(p => p.Id == incomingPoint.Id);
-                            if (oldPoint != null && !string.IsNullOrEmpty(oldPoint.StoredPhotoPath))
-                            {
-                                _photoService.DeletePhoto(oldPoint.StoredPhotoPath);
-                            }
-
-                            var photoPath = await _photoService.SavePhotoAsync(incomingPoint.PhotoUrl, _currentTravel.Id.ToString(), i.ToString());
-                            incomingPoint.StoredPhotoPath = photoPath;
-                            incomingPoint.PhotoUrl = "";
-                        }
-
-                        if (existingPointsDict.ContainsKey(incomingPoint.Id) && incomingPoint.Id > 0)
-                        {
-                            // Обновляем существующую точку
-                            var existingPoint = existingPointsDict[incomingPoint.Id];
-                            existingPoint.Latitude = incomingPoint.Latitude;
-                            existingPoint.Longitude = incomingPoint.Longitude;
-                            existingPoint.Title = incomingPoint.Title;
-                            existingPoint.IconEmoji = incomingPoint.IconEmoji;
-                            existingPoint.Description = incomingPoint.Description;
-                            existingPoint.IconColor = incomingPoint.IconColor;
-                            existingPoint.IconSize = incomingPoint.IconSize;
-                            existingPoint.Status = incomingPoint.Status;
-                            existingPoint.VisitDate = incomingPoint.VisitDate;
-                            existingPoint.Order = i;
-                            if (!string.IsNullOrEmpty(incomingPoint.StoredPhotoPath))
-                                existingPoint.StoredPhotoPath = incomingPoint.StoredPhotoPath;
-
-                            updatedPointIds.Add(existingPoint.Id);
-                        }
-                        else
-                        {
-                            // Новая точка
-                            incomingPoint.Id = 0;
-                            incomingPoint.Order = i;
-                            _currentTravel.RoutePoints.Add(incomingPoint);
-                            updatedPointIds.Add(incomingPoint.Id);
-                        }
-                    }
-
-                    // Удаляем точки, которых больше нет
-                    var pointsToRemove = _currentTravel.RoutePoints.Where(p => p.Id > 0 && !updatedPointIds.Contains(p.Id)).ToList();
-                    foreach (var point in pointsToRemove)
-                    {
-                        if (!string.IsNullOrEmpty(point.StoredPhotoPath))
-                            _photoService.DeletePhoto(point.StoredPhotoPath);
-                        _currentTravel.RoutePoints.Remove(point);
-                    }
+                    MessageBox.Show("Нет точек для сохранения", "Информация",
+                        MessageBoxButton.OK, MessageBoxImage.Information);
+                    return;
                 }
 
-                if (wrapper?.Strings != null)
+                // ========== 1. ВРЕМЕННО СОХРАНЯЕМ СВЯЗИ (С ИНДЕКСАМИ) ==========
+                var tempStrings = new List<TravelStringContract>();
+                if (wrapper.Strings != null)
                 {
-                    _currentTravel.TravelStrings.Clear();
-                    foreach (var travelString in wrapper.Strings)
+                    tempStrings.AddRange(wrapper.Strings);
+                    System.Diagnostics.Debug.WriteLine($"Temporary saved {tempStrings.Count} strings with indices");
+                }
+
+                // ========== 2. СОХРАНЯЕМ ТОЛЬКО ТОЧКИ ==========
+                var oldPoints = _currentTravel.RoutePoints.ToList();
+                foreach (var oldPoint in oldPoints)
+                {
+                    if (!string.IsNullOrEmpty(oldPoint.StoredPhotoPath))
                     {
-                        // travelString.From и travelString.To теперь содержат ID, а не индексы
+                        _photoService.DeletePhoto(oldPoint.StoredPhotoPath);
+                    }
+                }
+                _currentTravel.RoutePoints.Clear();
+
+                // Словарь для маппинга: старый ID -> новый ID
+                var oldIdToNewId = new Dictionary<int, int>();
+
+                for (int i = 0; i < wrapper.Points.Count; i++)
+                {
+                    var incomingPoint = wrapper.Points[i];
+                    int oldId = incomingPoint.Id;
+
+                    string savedPhotoPath = "";
+                    if (!string.IsNullOrEmpty(incomingPoint.PhotoUrl) && incomingPoint.PhotoUrl.StartsWith("data:image"))
+                    {
+                        savedPhotoPath = await _photoService.SavePhotoAsync(
+                            incomingPoint.PhotoUrl,
+                            _currentTravel.Id.ToString(),
+                            i.ToString()
+                        );
+                        System.Diagnostics.Debug.WriteLine($"Saved photo: {savedPhotoPath}");
+                    }
+                    else if (!string.IsNullOrEmpty(incomingPoint.StoredPhotoPath))
+                    {
+                        savedPhotoPath = incomingPoint.StoredPhotoPath;
+                    }
+
+                    var newPoint = new RoutePointViewModel
+                    {
+                        Id = 0,
+                        Latitude = incomingPoint.Latitude,
+                        Longitude = incomingPoint.Longitude,
+                        Title = incomingPoint.Title,
+                        IconEmoji = incomingPoint.IconEmoji,
+                        Description = incomingPoint.Description,
+                        IconColor = incomingPoint.IconColor,
+                        IconSize = incomingPoint.IconSize,
+                        Status = incomingPoint.Status,
+                        StoredPhotoPath = savedPhotoPath,
+                        VisitDate = incomingPoint.VisitDate,
+                        Order = i
+                    };
+
+                    _currentTravel.RoutePoints.Add(newPoint);
+
+                    // Сохраняем временно, чтобы получить ID
+                    await _dbService.SaveTravelAsync(_currentTravel);
+
+                    // Запоминаем маппинг старого ID на новый ID
+                    if (oldId > 0)
+                    {
+                        oldIdToNewId[oldId] = newPoint.Id;
+                    }
+                    System.Diagnostics.Debug.WriteLine($"Mapping: old Id={oldId} -> new Id={newPoint.Id}");
+                }
+
+                // ========== 3. СОЗДАЁМ СВЯЗИ С НОВЫМИ ID ==========
+                _currentTravel.TravelStrings.Clear();
+
+                foreach (var tempString in tempStrings)
+                {
+                    // Конвертируем индексы/старые ID в новые ID
+                    int newFromId = oldIdToNewId.ContainsKey(tempString.From) ? oldIdToNewId[tempString.From] : tempString.From;
+                    int newToId = oldIdToNewId.ContainsKey(tempString.To) ? oldIdToNewId[tempString.To] : tempString.To;
+
+                    // Проверяем, что точки с такими ID существуют
+                    bool fromExists = _currentTravel.RoutePoints.Any(p => p.Id == newFromId);
+                    bool toExists = _currentTravel.RoutePoints.Any(p => p.Id == newToId);
+
+                    System.Diagnostics.Debug.WriteLine($"Creating string: From={newFromId} (exists={fromExists}), To={newToId} (exists={toExists})");
+
+                    if (fromExists && toExists && newFromId != newToId)
+                    {
                         _currentTravel.TravelStrings.Add(new TravelStringViewModel
                         {
-                            From = travelString.From,   // Это уже ID
-                            To = travelString.To,       // Это уже ID
-                            Description = travelString.Description ?? "",
-                            Color = travelString.Color ?? "#ed8936",
-                            Width = travelString.Width > 0 ? travelString.Width : 2
+                            From = newFromId,
+                            To = newToId,
+                            Description = tempString.Description ?? "",
+                            Color = tempString.Color ?? "#ed8936",
+                            Width = tempString.Width > 0 ? tempString.Width : 2
                         });
                     }
                 }
 
+                // ========== 4. ФИНАЛЬНОЕ СОХРАНЕНИЕ ==========
                 await _dbService.SaveTravelAsync(_currentTravel);
 
                 MessageBox.Show($"Сохранено {_currentTravel.RoutePoints.Count} точек и {_currentTravel.TravelStrings.Count} связей!",
                     "Успех", MessageBoxButton.OK, MessageBoxImage.Information);
+
+                // Обновляем карту
+                LoadPointsToMap();
             }
             catch (Exception ex)
             {
+                System.Diagnostics.Debug.WriteLine($"Error: {ex.Message}");
+                System.Diagnostics.Debug.WriteLine($"Stack: {ex.StackTrace}");
                 MessageBox.Show($"Ошибка сохранения точек: {ex.Message}",
                     "Ошибка", MessageBoxButton.OK, MessageBoxImage.Error);
             }

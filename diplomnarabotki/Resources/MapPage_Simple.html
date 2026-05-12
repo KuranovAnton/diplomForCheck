@@ -908,32 +908,53 @@
 
         function createCurvedLine(sLat, sLng, eLat, eLng, color, weight) {
             try {
-                var p1 = map.latLngToLayerPoint([sLat, sLng]);
-                var p2 = map.latLngToLayerPoint([eLat, eLng]);
+                // Рассчитываем среднюю точку в географических координатах
+                var midLat = (sLat + eLat) / 2;
+                var midLng = (sLng + eLng) / 2;
 
-                var midX = (p1.x + p2.x) / 2;
-                var midY = (p1.y + p2.y) / 2;
+                // Расстояние между точками в градусах
+                var latDiff = Math.abs(sLat - eLat);
+                var lngDiff = Math.abs(sLng - eLng);
+                var distance = Math.sqrt(latDiff * latDiff + lngDiff * lngDiff);
 
-                var dx = p2.x - p1.x;
-                var dy = p2.y - p1.y;
-                var distance = Math.sqrt(dx * dx + dy * dy);
+                // Смещение для изгиба (в градусах)
+                var offset = distance * 0.15; // 15% от расстояния
 
-                var sag = Math.min(Math.max(distance * 0.12, 25), 80);
-                var controlY = midY + sag;
+                // Определяем направление изгиба (всегда в одну сторону для единообразия)
+                // Используем векторное произведение для определения "низа"
+                var dx = eLng - sLng;
+                var dy = eLat - sLat;
 
+                // Перпендикулярное направление (поворот на 90 градусов)
+                var perpX = -dy;
+                var perpY = dx;
+
+                // Нормализуем
+                var len = Math.sqrt(perpX * perpX + perpY * perpY);
+                if (len > 0) {
+                    perpX = perpX / len;
+                    perpY = perpY / len;
+                }
+
+                // Контрольная точка для изгиба
+                var controlLat = midLat + perpX * offset;
+                var controlLng = midLng + perpY * offset;
+
+                // Строим квадратичную кривую Безье
                 var points = [];
-                for (var t = 0; t <= 1; t += 0.04) {
+                for (var t = 0; t <= 1; t += 0.05) {
                     var mt = 1 - t;
-                    var x = mt * mt * p1.x + 2 * mt * t * midX + t * t * p2.x;
-                    var y = mt * mt * p1.y + 2 * mt * t * controlY + t * t * p2.y;
-                    var latLng = map.layerPointToLatLng({ x: x, y: y });
-                    points.push([latLng.lat, latLng.lng]);
+                    // Квадратичная кривая: (1-t)²*P0 + 2*(1-t)*t*P1 + t²*P2
+                    var lat = mt * mt * sLat + 2 * mt * t * controlLat + t * t * eLat;
+                    var lng = mt * mt * sLng + 2 * mt * t * controlLng + t * t * eLng;
+                    points.push([lat, lng]);
                 }
 
                 return L.polyline(points, { color: color, weight: weight, opacity: 0.8 });
             } catch (e) {
                 console.error('Error creating curved line:', e);
-                return null;
+                // Если ошибка - рисуем прямую линию
+                return L.polyline([[sLat, sLng], [eLat, eLng]], { color: color, weight: weight, opacity: 0.8 });
             }
         }
 
@@ -1254,10 +1275,17 @@
             if (input.files && input.files[0]) {
                 var reader = new FileReader();
                 reader.onload = function (e) {
-                    document.getElementById('photoPreview').innerHTML = '<img src="' + e.target.result + '" />';
-                    document.getElementById('photoUrl').value = e.target.result;
+                    var base64 = e.target.result;
+                    console.log('=== loadPhotoFromFile ===');
+                    console.log('File loaded, base64 length:', base64.length);
+                    console.log('Base64 starts with data:image:', base64.indexOf('data:image') === 0);
+                    document.getElementById('photoPreview').innerHTML = '<img src="' + base64 + '" style="max-width:200px;max-height:150px;" />';
+                    document.getElementById('photoUrl').value = base64;
+                    console.log('photoUrl input value set, length:', document.getElementById('photoUrl').value.length);
                 };
                 reader.readAsDataURL(input.files[0]);
+            } else {
+                console.log('No file selected');
             }
         }
 
@@ -1441,15 +1469,24 @@
             }
         }
 
-        function addMarker(lat, lng, title, emoji, desc, color, size, status, photo, date, pointId) {
+        function addMarker(lat, lng, title, emoji, desc, color, size, status, photo, date, pointId, storedPhotoPath) {
+
             try {
                 emoji = (emoji && typeof emoji === 'string') ? emoji : '📍';
                 desc = (desc && typeof desc === 'string') ? desc : '';
                 color = (color && typeof color === 'string') ? color : '#e2e8f0';
                 size = (size && typeof size === 'number') ? size : 36;
                 status = (status && typeof status === 'string') ? status : 'planned';
-                photo = (photo && typeof photo === 'string') ? photo : '';
                 date = (date && typeof date === 'string') ? date : '';
+
+                // ✅ ВАЖНО: сохраняем фото
+                var finalPhoto = (photo && typeof photo === 'string') ? photo : '';
+                var finalStoredPhotoPath = (storedPhotoPath && typeof storedPhotoPath === 'string') ? storedPhotoPath : '';
+
+                console.log('=== addMarker ===');
+                console.log('Title:', title);
+                console.log('Photo base64 length:', finalPhoto.length);
+                console.log('StoredPhotoPath:', finalStoredPhotoPath);
 
                 if (typeof lat !== 'number' || typeof lng !== 'number' || isNaN(lat) || isNaN(lng)) {
                     console.error('Invalid coordinates:', lat, lng);
@@ -1459,7 +1496,6 @@
                 var icon = createIcon(emoji, color, size, title, status);
                 var marker = L.marker([lat, lng], { draggable: true, icon: icon }).addTo(map);
 
-                // Для новых точек генерируем уникальный отрицательный ID
                 var newId = (pointId && pointId > 0) ? pointId : -(Math.floor(Math.random() * 2147483647) + 1);
 
                 var statusText = '';
@@ -1470,7 +1506,9 @@
                 var popup = '<b>' + escapeHtml(title) + '</b><br/>📍 ' + lat.toFixed(5) + ', ' + lng.toFixed(5) + '<br/>📌 ' + statusText;
                 if (date) popup += '<br/>📅 ' + date;
                 if (desc) popup += '<br/>📖 ' + desc;
-                if (photo) popup += '<br/><img src="' + photo + '" style="max-width:150px;max-height:100px;border-radius:8px;margin-top:5px;" />';
+                if (finalPhoto && finalPhoto.length > 0) {
+                    popup += '<br/><img src="' + finalPhoto + '" style="max-width:150px;max-height:100px;border-radius:8px;margin-top:5px;" />';
+                }
                 popup += '<br/><button onclick="openEditModal(' + newId + ')">✏️ Редактировать</button> <button onclick="removeMarker(' + newId + ')">🗑️ Удалить</button>';
                 marker.bindPopup(popup);
 
@@ -1501,7 +1539,8 @@
                     iconColor: color,
                     iconSize: size,
                     status: status,
-                    photoUrl: photo,
+                    photoUrl: finalPhoto,
+                    storedPhotoPath: finalStoredPhotoPath,
                     visitDate: date
                 });
 
@@ -1511,6 +1550,10 @@
                 return marker;
             } catch (error) {
                 console.error('Error in addMarker:', error);
+                console.log('=== addMarker PHOTO DEBUG ===');
+                console.log('Title:', title);
+                console.log('finalPhoto length:', finalPhoto.length);
+                console.log('finalPhoto starts with data:image:', finalPhoto.substring(0, 30));
                 return null;
             }
         }
@@ -1563,9 +1606,18 @@
             document.getElementById('iconSize').value = point.iconSize || 36;
             if (point.visitDate) $("#visitDatePicker").val(point.visitDate);
             else $("#visitDatePicker").val('');
-            document.getElementById('photoUrl').value = point.photoUrl || '';
+
+            // ✅ Загружаем фото из storedPhotoPath если есть, или из photoUrl
+            var photoToShow = point.photoUrl || '';
+            if (!photoToShow && point.storedPhotoPath) {
+                // Если есть путь к файлу, но нет base64, нужно загрузить через сервер
+                // Пока показываем заглушку
+                photoToShow = '';
+            }
+            document.getElementById('photoUrl').value = photoToShow;
             document.getElementById('photoFile').value = '';
             updatePhotoPreview();
+
             selectedIcon = point.iconEmoji;
             iconColor = point.iconColor || '#e2e8f0';
             iconSize = point.iconSize || 36;
@@ -1628,22 +1680,33 @@
                 var point = findMarkerById(currentEditingId);
                 if (!point) return;
 
-                var newTitle = document.getElementById('editTitle').value;
-                if (newTitle === '') newTitle = 'Новое место';
-                point.title = newTitle;
-                point.description = document.getElementById('editDescription').value;
+                var photoInput = document.getElementById('photoUrl');
+                var newPhotoUrl = photoInput ? photoInput.value : '';
+
+                console.log('=== savePointEdit ===');
+                console.log('newPhotoUrl length:', newPhotoUrl.length);
+
+                point.title = document.getElementById('editTitle').value || 'Новое место';
+                point.description = document.getElementById('editDescription').value || '';
                 point.iconEmoji = selectedIcon;
                 point.iconColor = iconColor;
                 point.iconSize = parseInt(document.getElementById('iconSize').value, 10);
                 point.status = document.getElementById('statusValue').value;
-                point.photoUrl = document.getElementById('photoUrl').value;
                 point.visitDate = $("#visitDatePicker").val();
+
+                if (newPhotoUrl && newPhotoUrl.length > 100) {
+                    point.photoUrl = newPhotoUrl;
+                    point.storedPhotoPath = '';
+                    console.log('Saving new photo, length:', point.photoUrl.length);
+                } else {
+                    console.log('No new photo, keeping existing');
+                }
 
                 updateMarkerIconById(currentEditingId);
                 drawAllStrings();
                 saveToCSharp();
+                closeEditModal();
             }
-            closeEditModal();
         }
 
         function updateMarkerIconById(pointId) {
@@ -2033,30 +2096,34 @@
         function exportPoints() {
             try {
                 console.log('=== exportPoints called ===');
-                console.log('Markers count:', markers.length);
-                console.log('Strings count:', strings.length);
+                console.log('Total markers:', markers.length);
 
                 var pointsArr = [];
                 for (var i = 0; i < markers.length; i++) {
+                    var m = markers[i];
+                    console.log('Point', i, 'Title:', m.title);
+                    console.log('Point', i, 'photoUrl length:', m.photoUrl ? m.photoUrl.length : 0);
+                    console.log('Point', i, 'storedPhotoPath:', m.storedPhotoPath);
+
                     pointsArr.push({
-                        Id: markers[i].id,
-                        Latitude: markers[i].lat,
-                        Longitude: markers[i].lng,
-                        Title: markers[i].title,
-                        IconEmoji: markers[i].iconEmoji,
-                        Description: markers[i].description || '',
-                        IconColor: markers[i].iconColor || '#e2e8f0',
-                        IconSize: markers[i].iconSize || 36,
-                        Status: markers[i].status || 'planned',
-                        PhotoUrl: markers[i].photoUrl || '',
-                        VisitDate: markers[i].visitDate || '',
+                        Id: m.id,
+                        Latitude: m.lat,
+                        Longitude: m.lng,
+                        Title: m.title,
+                        IconEmoji: m.iconEmoji,
+                        Description: m.description || '',
+                        IconColor: m.iconColor || '#e2e8f0',
+                        IconSize: m.iconSize || 36,
+                        Status: m.status || 'planned',
+                        PhotoUrl: m.photoUrl || '',
+                        StoredPhotoPath: m.storedPhotoPath || '',
+                        VisitDate: m.visitDate || '',
                         Order: i
                     });
                 }
 
                 var currentStrings = [];
                 for (var i = 0; i < strings.length; i++) {
-                    console.log('String', i, 'fromId:', strings[i].fromId, 'toId:', strings[i].toId);
                     currentStrings.push({
                         FromId: strings[i].fromId,
                         ToId: strings[i].toId,
@@ -2067,7 +2134,12 @@
                 }
 
                 var result = JSON.stringify({ points: pointsArr, strings: currentStrings });
-                console.log('Export result strings count:', currentStrings.length);
+                console.log('Final JSON length:', result.length);
+                console.log('PhotoUrl in JSON:', result.indexOf('PhotoUrl'));
+                console.log('=== exportPoints STRINGS ===');
+                for (var i = 0; i < strings.length; i++) {
+                    console.log('String', i, 'fromId:', strings[i].fromId, 'toId:', strings[i].toId);
+                }
                 return result;
             } catch (error) {
                 console.error('Error in exportPoints:', error);
@@ -2077,12 +2149,19 @@
 
         function loadPoints(data) {
             try {
-                console.log('Loading points...');
+                console.log('=== loadPoints ===');
                 if (!data) return;
 
                 var parsed = (typeof data === 'string') ? JSON.parse(data) : data;
                 var pts = parsed.points || parsed;
                 var strs = parsed.strings || [];
+
+                console.log('Points count:', pts.length);
+                for (var i = 0; i < pts.length; i++) {
+                    var p = pts[i];
+                    console.log('Point', i, 'PhotoUrl length:', p.PhotoUrl ? p.PhotoUrl.length : 0);
+                    console.log('Point', i, 'StoredPhotoPath:', p.StoredPhotoPath);
+                }
 
                 for (var i = 0; i < markers.length; i++) {
                     if (markers[i] && markers[i].marker) {
@@ -2094,7 +2173,6 @@
 
                 for (var i = 0; i < pts.length; i++) {
                     var p = pts[i];
-                    // Передаём ID как есть (может быть отрицательным)
                     addMarker(
                         parseFloat(p.Latitude || 0),
                         parseFloat(p.Longitude || 0),
@@ -2106,7 +2184,8 @@
                         p.Status || 'planned',
                         p.PhotoUrl || '',
                         p.VisitDate || '',
-                        p.Id || 0  // Отрицательные ID остаются отрицательными
+                        p.Id || 0,
+                        p.StoredPhotoPath || ''
                     );
                 }
 

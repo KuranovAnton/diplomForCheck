@@ -1002,26 +1002,6 @@ namespace diplomnarabotki.Views
             }
         }
 
-        private async void BtnSaveTravel_Click(object sender, RoutedEventArgs e)
-        {
-            if (_currentTravel != null)
-            {
-                _currentTravel.Name = TxtTravelName.Text;
-                _currentTravel.Route = TxtRoute.Text;
-
-                try
-                {
-                    await _dbService.SaveTravelAsync(_currentTravel);
-                    MessageBox.Show("Путешествие сохранено в базу данных!", "Успех",
-                        MessageBoxButton.OK, MessageBoxImage.Information);
-                }
-                catch (Exception ex)
-                {
-                    MessageBox.Show($"Ошибка сохранения: {ex.Message}", "Ошибка",
-                        MessageBoxButton.OK, MessageBoxImage.Error);
-                }
-            }
-        }
 
         private async void BtnForceSave_Click(object sender, RoutedEventArgs e)
         {
@@ -1667,6 +1647,20 @@ namespace diplomnarabotki.Views
             }
 
             NavigationService?.Navigate(new MapPage());
+        }
+
+        private void MemoriesButton_Click(object sender, RoutedEventArgs e)
+        {
+            if (_currentTravel != null)
+            {
+                var memoriesPage = new MemoriesPage(_currentTravel);
+                NavigationService?.Navigate(memoriesPage);
+            }
+            else
+            {
+                MessageBox.Show("Сначала выберите путешествие", "Информация",
+                    MessageBoxButton.OK, MessageBoxImage.Information);
+            }
         }
     }
 }

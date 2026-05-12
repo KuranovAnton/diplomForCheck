@@ -92,7 +92,7 @@ namespace diplomnarabotki.Views {
                 return;
             }
             _contentLoaded = true;
-            System.Uri resourceLocater = new System.Uri("/diplomnarabotki;component/views/createtraveldialog.xaml", System.UriKind.Relative);
+            System.Uri resourceLocater = new System.Uri("/H.I.N.A.S;component/views/createtraveldialog.xaml", System.UriKind.Relative);
             
             #line 1 "..\..\..\..\Views\CreateTravelDialog.xaml"
             System.Windows.Application.LoadComponent(this, resourceLocater);

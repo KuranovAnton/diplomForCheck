@@ -4839,9 +4839,9 @@
   "project": {
     "version": "1.0.0",
     "restore": {
-      "projectUniqueName": "C:\\Users\\Msi\\source\\repos\\diplomForCheck\\diplomnarabotki\\diplomnarabotki.csproj",
-      "projectName": "diplomnarabotki",
-      "projectPath": "C:\\Users\\Msi\\source\\repos\\diplomForCheck\\diplomnarabotki\\diplomnarabotki.csproj",
+      "projectUniqueName": "C:\\Users\\Msi\\source\\repos\\diplomForCheck\\diplomnarabotki\\H.I.N.A.S.csproj",
+      "projectName": "H.I.N.A.S",
+      "projectPath": "C:\\Users\\Msi\\source\\repos\\diplomForCheck\\diplomnarabotki\\H.I.N.A.S.csproj",
       "packagesPath": "C:\\Users\\Msi\\.nuget\\packages\\",
       "outputPath": "C:\\Users\\Msi\\source\\repos\\diplomForCheck\\diplomnarabotki\\obj\\",
       "projectStyle": "PackageReference",

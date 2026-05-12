@@ -1,0 +1,166 @@
+﻿<Page x:Class="diplomnarabotki.Views.MemoriesPage"
+      xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+      xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+      xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" 
+      xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+      mc:Ignorable="d" 
+      d:DesignHeight="700" d:DesignWidth="1000"
+      Title="Воспоминания"
+      Background="White"
+      Loaded="Page_Loaded">
+
+    <Page.Resources>
+        <!-- Стиль для карточки воспоминания -->
+        <Style x:Key="MemoryCardStyle" TargetType="Border">
+            <Setter Property="Width" Value="240"/>
+            <Setter Property="Height" Value="320"/>
+            <Setter Property="Background" Value="White"/>
+            <Setter Property="BorderBrush" Value="#DDDDDD"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="CornerRadius" Value="12"/>
+            <Setter Property="Effect">
+                <Setter.Value>
+                    <DropShadowEffect BlurRadius="10" ShadowDepth="3" Opacity="0.25"/>
+                </Setter.Value>
+            </Setter>
+            <Style.Triggers>
+                <Trigger Property="IsMouseOver" Value="True">
+                    <Setter Property="Effect">
+                        <Setter.Value>
+                            <DropShadowEffect BlurRadius="15" ShadowDepth="5" Opacity="0.35"/>
+                        </Setter.Value>
+                    </Setter>
+                    <Setter Property="BorderBrush" Value="#667eea"/>
+                    <Setter Property="Cursor" Value="Hand"/>
+                </Trigger>
+            </Style.Triggers>
+        </Style>
+
+        <!-- Стиль для скроллера -->
+        <Style TargetType="ScrollViewer">
+            <Setter Property="VerticalScrollBarVisibility" Value="Auto"/>
+            <Setter Property="HorizontalScrollBarVisibility" Value="Auto"/>
+        </Style>
+    </Page.Resources>
+
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+        </Grid.RowDefinitions>
+
+        <!-- Панель инструментов -->
+        <Border Grid.Row="0" Background="#FFF5F5F5" BorderBrush="#FFE0E0E0" BorderThickness="0,0,0,1">
+            <StackPanel Orientation="Horizontal" Margin="10" HorizontalAlignment="Left">
+                <Button x:Name="AutoArrangeButton" 
+                        Content="🔄 Авто-раскладка" 
+                        Margin="5"
+                        Padding="10,5"
+                        Click="AutoArrangeButton_Click"
+                        Background="#667eea"
+                        Foreground="White"
+                        BorderBrush="#667eea"
+                        Cursor="Hand"
+                        FontWeight="Bold"/>
+                <Button x:Name="ResetPositionsButton" 
+                        Content="🗑️ Сбросить позиции" 
+                        Margin="5"
+                        Padding="10,5"
+                        Click="ResetPositionsButton_Click"
+                        Background="#e53e3e"
+                        Foreground="White"
+                        BorderBrush="#e53e3e"
+                        Cursor="Hand"
+                        FontWeight="Bold"/>
+                <Button x:Name="ExportImageButton" 
+                        Content="📸 Экспорт" 
+                        Margin="5"
+                        Padding="10,5"
+                        Click="ExportImageButton_Click"
+                        Background="#48bb78"
+                        Foreground="White"
+                        BorderBrush="#48bb78"
+                        Cursor="Hand"
+                        FontWeight="Bold"
+                        ToolTip="Сохранить доску как изображение"/>
+                <Button x:Name="UndoButton" 
+                        Content="↩️ Откатить" 
+                        Margin="5"
+                        Padding="10,5"
+                        Click="UndoButton_Click"
+                        Background="#f39c12"
+                        Foreground="White"
+                        BorderBrush="#f39c12"
+                        Cursor="Hand"
+                        FontWeight="Bold"
+                        IsEnabled="False"
+                        ToolTip="Вернуть последнее удаление"/>
+                <Button x:Name="ArrangeByMapButton" 
+                        Content="🗺️ Как на карте" 
+                        Margin="5"
+                        Padding="10,5"
+                        Click="ArrangeByMapButton_Click"
+                        Background="#3498db"
+                        Foreground="White"
+                        BorderBrush="#3498db"
+                        Cursor="Hand"
+                        FontWeight="Bold"
+                        ToolTip="Расположить карточки согласно координатам точек на карте"/>
+                <Button x:Name="ResetZoomButton" 
+                        Content="🔍 Сбросить масштаб" 
+                        Margin="5"
+                        Padding="10,5"
+                        Click="ResetZoomButton_Click"
+                        Background="#e67e22"
+                        Foreground="White"
+                        BorderBrush="#e67e22"
+                        Cursor="Hand"
+                        FontWeight="Bold"
+                        ToolTip="Сбросить масштаб"/>
+                <TextBlock Text="|" Margin="15,0" VerticalAlignment="Center" Foreground="#FFCCCCCC"/>
+                <TextBlock Text="💡 Перетаскивайте карточки мышью, двигайте доску зажатой ПРАВОЙ кнопкой, масштабируйте Ctrl+колёсико" 
+                           Margin="10,0"
+                           VerticalAlignment="Center"
+                           FontSize="11"
+                           Foreground="#FF888888"
+                           FontStyle="Italic"/>
+            </StackPanel>
+        </Border>
+
+        <!-- Панель фильтров -->
+        <Border Grid.Row="1" Background="White" BorderBrush="#FFE0E0E0" BorderThickness="0,1,0,1">
+            <StackPanel Orientation="Horizontal" Margin="10">
+                <TextBlock Text="📋 Фильтр: " VerticalAlignment="Center" FontWeight="Bold" Margin="0,0,10,0"/>
+                <RadioButton x:Name="FilterAll" Content="Все" IsChecked="True" Margin="5" VerticalAlignment="Center" Checked="Filter_Changed"/>
+                <RadioButton x:Name="FilterVisited" Content="✅ Посещено" Margin="5" VerticalAlignment="Center" Checked="Filter_Changed"/>
+                <RadioButton x:Name="FilterPlanned" Content="📅 Запланировано" Margin="5" VerticalAlignment="Center" Checked="Filter_Changed"/>
+                <RadioButton x:Name="FilterWish" Content="⭐ Хочу посетить" Margin="5" VerticalAlignment="Center" Checked="Filter_Changed"/>
+
+                <Separator Margin="15,0" Width="1" Background="#FFCCCCCC"/>
+
+                <TextBlock Text="🔗 Показывать связи:" VerticalAlignment="Center" Margin="10,0,5,0"/>
+                <CheckBox x:Name="ShowConnectionsCheckbox" IsChecked="True" Margin="0,0,10,0" VerticalAlignment="Center" Checked="ShowConnections_Changed" Unchecked="ShowConnections_Changed"/>
+            </StackPanel>
+        </Border>
+
+        <!-- Основной Canvas для доски -->
+        <ScrollViewer Grid.Row="2" x:Name="MainScrollViewer" 
+                      PreviewMouseWheel="MainScrollViewer_PreviewMouseWheel"
+                      MouseRightButtonDown="MainScrollViewer_MouseRightButtonDown"
+                      MouseRightButtonUp="MainScrollViewer_MouseRightButtonUp"
+                      MouseMove="MainScrollViewer_MouseMove"
+                      MouseLeave="MainScrollViewer_MouseLeave"
+                      Cursor="Hand">
+            <Canvas x:Name="MemoriesCanvas" 
+                    Background="#FFFAFAFA"
+                    MinWidth="1200" 
+                    MinHeight="800"
+                    SizeChanged="MemoriesCanvas_SizeChanged">
+
+                <!-- Линии и карточки будут добавляться динамически -->
+
+            </Canvas>
+        </ScrollViewer>
+    </Grid>
+</Page>

@@ -75,15 +75,15 @@
                         Background="#4CAF50" Foreground="White" BorderThickness="0"
                         Cursor="Hand" FontWeight="Bold"/>
 
-                <Button x:Name="BtnSaveTravel" Content="💾 Сохранить" 
-                        Click="BtnSaveTravel_Click" Width="120" Height="35" Margin="5"
-                        Background="#2196F3" Foreground="White" BorderThickness="0"
-                        Cursor="Hand" FontWeight="Bold"/>
-
                 <Button x:Name="BtnOpenMap" Content="🗺️ Карта маршрута" 
                         Click="BtnOpenMap_Click" Width="140" Height="35" Margin="5"
                         Background="#9C27B0" Foreground="White" BorderThickness="0"
                         Cursor="Hand" FontWeight="Bold"/>
+
+                <Button x:Name="MemoriesButton" Content="📸 Воспоминания" 
+                        Margin="5" Padding="10,5" Click="MemoriesButton_Click"
+                        Background="#9b59b6" Foreground="White"
+                        BorderBrush="#9b59b6" Cursor="Hand" FontWeight="Bold"/>
 
                 <Separator Width="20" Visibility="Visible"/>
 
@@ -574,7 +574,7 @@
             </Grid>
         </Border>
 
-        <!-- Диалог создания заметки (остается без изменений) -->
+        <!-- Диалог создания заметки -->
         <Grid x:Name="NoteDialog" Grid.RowSpan="2" Grid.ColumnSpan="2" 
               Background="#80000000" Visibility="Collapsed">
             <Border Background="White" Width="550" Height="650" CornerRadius="10" 

@@ -10,11 +10,11 @@ none
 false
 TRACE;DEBUG;NET;NET10_0;NETCOREAPP;WINDOWS;WINDOWS7_0;NET5_0_OR_GREATER;NET6_0_OR_GREATER;NET7_0_OR_GREATER;NET8_0_OR_GREATER;NET9_0_OR_GREATER;NET10_0_OR_GREATER;NETCOREAPP3_0_OR_GREATER;NETCOREAPP3_1_OR_GREATER;WINDOWS7_0_OR_GREATER
 C:\Users\Msi\source\repos\diplomForCheck\diplomnarabotki\App.xaml
-3-546571186
+42104851127
 3-153803955
-30914275714
+31-607880964
 264-1849013482
-Views\CreateTravelDialog.xaml;Views\MapPage.xaml;Views\Planer.xaml;
+Views\CreateTravelDialog.xaml;Views\MapPage.xaml;Views\MemoriesPage.xaml;Views\Planer.xaml;
 
 False
 

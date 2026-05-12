@@ -66,6 +66,7 @@ namespace diplomnarabotki.Data
             });
 
             // Настройка RoutePoint
+            // Настройка RoutePoint
             modelBuilder.Entity<RoutePointEntity>(entity =>
             {
                 entity.HasKey(e => e.Id);
@@ -76,6 +77,7 @@ namespace diplomnarabotki.Data
                 entity.Property(e => e.IconColor).HasMaxLength(20);
                 entity.Property(e => e.Status).HasMaxLength(50);
                 entity.Property(e => e.PhotoUrl).HasMaxLength(500);
+                entity.Property(e => e.StoredPhotoPath).HasMaxLength(500);  // ✅ ДОБАВЬ ЭТУ СТРОКУ
                 entity.Property(e => e.VisitDate).HasMaxLength(50);
                 entity.HasOne(e => e.Travel).WithMany(e => e.RoutePoints).HasForeignKey(e => e.TravelId).OnDelete(DeleteBehavior.Cascade);
             });

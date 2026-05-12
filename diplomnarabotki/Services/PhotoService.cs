@@ -12,10 +12,7 @@ namespace diplomnarabotki.Services
 
         public PhotoService()
         {
-            // Папка для хранения фото в директории приложения
             _photosDirectory = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Photos");
-
-            // Создаем папку, если её нет
             if (!Directory.Exists(_photosDirectory))
             {
                 Directory.CreateDirectory(_photosDirectory);
@@ -30,7 +27,6 @@ namespace diplomnarabotki.Services
 
             try
             {
-                // Удаляем префикс "data:image/png;base64," если есть
                 var base64 = base64Data;
                 if (base64Data.Contains(","))
                 {
@@ -38,23 +34,29 @@ namespace diplomnarabotki.Services
                 }
 
                 // Определяем расширение файла
-                string extension = ".png";
+                string extension = ".png"; // по умолчанию
                 if (base64Data.Contains("image/jpeg") || base64Data.Contains("image/jpg"))
                     extension = ".jpg";
                 else if (base64Data.Contains("image/png"))
                     extension = ".png";
                 else if (base64Data.Contains("image/gif"))
                     extension = ".gif";
+                else if (base64Data.Contains("image/bmp"))
+                    extension = ".bmp";
+                else if (base64Data.Contains("image/webp"))
+                    extension = ".webp";
 
-                // Генерируем уникальное имя файла
+                System.Diagnostics.Debug.WriteLine($"Extension detected: {extension}");
+
                 var fileName = $"{travelId}_{pointId}_{DateTime.Now.Ticks}{extension}";
                 var filePath = Path.Combine(_photosDirectory, fileName);
 
-                // Конвертируем base64 в байты и сохраняем
                 var imageBytes = Convert.FromBase64String(base64);
                 await File.WriteAllBytesAsync(filePath, imageBytes);
 
-                // Возвращаем относительный путь
+                System.Diagnostics.Debug.WriteLine($"File saved: {fileName}");
+                System.Diagnostics.Debug.WriteLine($"Full path: {filePath}");
+
                 return $"Photos/{fileName}";
             }
             catch (Exception ex)
@@ -67,32 +69,33 @@ namespace diplomnarabotki.Services
         // Загрузка фото из файла в base64
         public async Task<string> LoadPhotoAsBase64Async(string relativePath)
         {
-            if (string.IsNullOrEmpty(relativePath))
-                return string.Empty;
+            var fullPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, relativePath);
+            System.Diagnostics.Debug.WriteLine($"=== LOAD PHOTO DEBUG ===");
+            System.Diagnostics.Debug.WriteLine($"Relative: {relativePath}");
+            System.Diagnostics.Debug.WriteLine($"Full path: {fullPath}");
+            System.Diagnostics.Debug.WriteLine($"File exists: {File.Exists(fullPath)}");
 
-            try
+            if (File.Exists(fullPath))
             {
-                var fullPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, relativePath);
-                if (File.Exists(fullPath))
+                try
                 {
                     var bytes = await File.ReadAllBytesAsync(fullPath);
-                    var extension = Path.GetExtension(fullPath).ToLower();
-                    var mimeType = extension switch
-                    {
-                        ".jpg" or ".jpeg" => "image/jpeg",
-                        ".png" => "image/png",
-                        ".gif" => "image/gif",
-                        _ => "image/png"
-                    };
-                    return $"data:{mimeType};base64,{Convert.ToBase64String(bytes)}";
+                    System.Diagnostics.Debug.WriteLine($"File size: {bytes.Length} bytes");
+                    var base64 = Convert.ToBase64String(bytes);
+                    System.Diagnostics.Debug.WriteLine($"Base64 length: {base64.Length}");
+                    return $"data:image/png;base64,{base64}";
+                }
+                catch (Exception ex)
+                {
+                    System.Diagnostics.Debug.WriteLine($"Error reading file: {ex.Message}");
+                    return "";
                 }
             }
-            catch (Exception ex)
+            else
             {
-                System.Diagnostics.Debug.WriteLine($"Ошибка загрузки фото: {ex.Message}");
+                System.Diagnostics.Debug.WriteLine($"File NOT FOUND");
+                return "";
             }
-
-            return string.Empty;
         }
 
         // Удаление фото
@@ -121,7 +124,6 @@ namespace diplomnarabotki.Services
             if (!Directory.Exists(_photosDirectory))
                 return;
 
-            // Собираем все используемые пути
             var usedPaths = new HashSet<string>();
             foreach (var travel in travels)
             {
@@ -134,7 +136,6 @@ namespace diplomnarabotki.Services
                 }
             }
 
-            // Удаляем неиспользуемые файлы
             foreach (var file in Directory.GetFiles(_photosDirectory))
             {
                 var relativePath = $"Photos/{Path.GetFileName(file)}";

@@ -814,3 +814,5 @@ C:\Users\Msi\source\repos\diplomForCheck\diplomnarabotki\obj\Debug\net10.0-windo
 C:\Users\Msi\source\repos\diplomForCheck\diplomnarabotki\obj\Debug\net10.0-windows\Views\MapPage.g.cs
 C:\Users\Msi\source\repos\diplomForCheck\diplomnarabotki\obj\Debug\net10.0-windows\Views\Planer.g.cs
 C:\Users\Msi\source\repos\diplomForCheck\diplomnarabotki\obj\Debug\net10.0-windows\Views\Planer.baml
+C:\Users\Msi\source\repos\diplomForCheck\diplomnarabotki\obj\Debug\net10.0-windows\Views\MemoriesPage.baml
+C:\Users\Msi\source\repos\diplomForCheck\diplomnarabotki\obj\Debug\net10.0-windows\Views\MemoriesPage.g.cs

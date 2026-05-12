@@ -93,6 +93,7 @@ namespace diplomnarabotki.Data
     }
 
     // Точка маршрута
+    // Точка маршрута
     public class RoutePointEntity
     {
         public int Id { get; set; }
@@ -108,6 +109,7 @@ namespace diplomnarabotki.Data
         public int IconSize { get; set; } = 36;
         public string Status { get; set; } = "planned";
         public string PhotoUrl { get; set; } = "";
+        public string StoredPhotoPath { get; set; } = "";  // ✅ ДОБАВЬ ЭТУ СТРОКУ
         public string VisitDate { get; set; } = "";
 
         [JsonIgnore]

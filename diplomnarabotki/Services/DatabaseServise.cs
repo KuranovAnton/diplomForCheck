@@ -273,7 +273,7 @@ namespace diplomnarabotki.Services
                     IconSize = pointEntity.IconSize,
                     Status = pointEntity.Status,
                     PhotoUrl = photoBase64,
-                    StoredPhotoPath = pointEntity.PhotoUrl,
+                    StoredPhotoPath = pointEntity.StoredPhotoPath,  // ✅ ДОБАВЬ ЭТУ СТРОКУ
                     VisitDate = pointEntity.VisitDate
                 };
                 travel.RoutePoints.Add(routePoint);
@@ -401,6 +401,7 @@ namespace diplomnarabotki.Services
                     IconSize = point.IconSize,
                     Status = point.Status,
                     PhotoUrl = photoPath,
+                    StoredPhotoPath = photoPath,  // ✅ ДОБАВЬ ЭТУ СТРОКУ
                     VisitDate = point.VisitDate
                 });
             }
@@ -513,28 +514,22 @@ namespace diplomnarabotki.Services
                     existingPoint.Status = point.Status;
                     existingPoint.VisitDate = point.VisitDate;
 
-                    // Обновляем фото
-                    if (!string.IsNullOrEmpty(point.PhotoUrl) && point.PhotoUrl.StartsWith("data:image"))
+                    // ✅ ДОБАВЬ ЭТО - сохраняем фото, если они не изменились
+                    if (!string.IsNullOrEmpty(point.StoredPhotoPath))
                     {
-                        if (!string.IsNullOrEmpty(existingPoint.PhotoUrl) && existingPoint.PhotoUrl.StartsWith("Photos/"))
-                            _photoService.DeletePhoto(existingPoint.PhotoUrl);
-
+                        existingPoint.StoredPhotoPath = point.StoredPhotoPath;
+                    }
+                    // Если пришло новое фото в base64
+                    else if (!string.IsNullOrEmpty(point.PhotoUrl) && point.PhotoUrl.StartsWith("data:image"))
+                    {
                         var photoPath = await _photoService.SavePhotoAsync(point.PhotoUrl, existing.Id.ToString(), pointOrder.ToString());
-                        existingPoint.PhotoUrl = photoPath;
-                        point.PhotoUrl = "";
+                        existingPoint.StoredPhotoPath = photoPath;
                         point.StoredPhotoPath = photoPath;
                     }
-                    else if (string.IsNullOrEmpty(point.PhotoUrl) && !string.IsNullOrEmpty(existingPoint.PhotoUrl))
+                    // Если фото не менялось - оставляем старый путь
+                    else if (string.IsNullOrEmpty(point.StoredPhotoPath) && !string.IsNullOrEmpty(existingPoint.StoredPhotoPath))
                     {
-                        if (existingPoint.PhotoUrl.StartsWith("Photos/"))
-                            _photoService.DeletePhoto(existingPoint.PhotoUrl);
-                        existingPoint.PhotoUrl = "";
-                        point.StoredPhotoPath = "";
-                    }
-                    else if (!string.IsNullOrEmpty(point.StoredPhotoPath) && string.IsNullOrEmpty(point.PhotoUrl))
-                    {
-                        // Фото не менялось, сохраняем существующий путь
-                        existingPoint.PhotoUrl = point.StoredPhotoPath;
+                        point.StoredPhotoPath = existingPoint.StoredPhotoPath;
                     }
 
                     updatedPointIds.Add(existingPoint.Id);
@@ -568,6 +563,7 @@ namespace diplomnarabotki.Services
                         IconSize = point.IconSize,
                         Status = point.Status,
                         PhotoUrl = photoPath,
+                        StoredPhotoPath = photoPath,  // ✅ ДОБАВЬ ЭТУ СТРОКУ
                         VisitDate = point.VisitDate
                     };
                     existing.RoutePoints.Add(newPoint);
