@@ -12,6 +12,13 @@
 	  <None Remove="Resources\leaflet.css" />
 	  <None Remove="Resources\leaflet.js" />
 	  <None Remove="Resources\MapPage_Simple.html" />
+	  <None Remove="Views\Images\backMapPageButton.png" />
+	  <None Remove="Views\Images\backMemoriesPageButton.png" />
+	  <None Remove="Views\Images\goMapPageButton.png" />
+	  <None Remove="Views\Images\goMemoriesPageButton.png" />
+	  <None Remove="Views\Images\mapPageBackground.png" />
+	  <None Remove="Views\Images\memoriesPageBackground.png" />
+	  <None Remove="Views\Images\planerBackground.png" />
 	</ItemGroup>
 
 	<ItemGroup>
@@ -40,6 +47,30 @@
 		  <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
 		</PackageReference>
 		<PackageReference Include="RolandK.Formats.Gpx" Version="1.0.1" />
+	</ItemGroup>
+
+	<ItemGroup>
+	  <Resource Include="Views\Images\backMapPageButton.png">
+	    <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+	  </Resource>
+	  <Resource Include="Views\Images\backMemoriesPageButton.png">
+	    <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+	  </Resource>
+	  <Resource Include="Views\Images\goMapPageButton.png">
+	    <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+	  </Resource>
+	  <Resource Include="Views\Images\goMemoriesPageButton.png">
+	    <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+	  </Resource>
+	  <Resource Include="Views\Images\mapPageBackground.png">
+	    <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+	  </Resource>
+	  <Resource Include="Views\Images\memoriesPageBackground.png">
+	    <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+	  </Resource>
+	  <Resource Include="Views\Images\planerBackground.png">
+	    <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+	  </Resource>
 	</ItemGroup>
 
 </Project>

@@ -78,6 +78,14 @@ namespace diplomnarabotki.Views
             }
         }
 
+        private async void BtnBack_Click(object sender, RoutedEventArgs e)
+        {
+            if (NavigationService != null)
+            {
+                NavigationService.GoBack();
+            }
+        }
+
         private void ShowEmptyMessage()
         {
             var emptyMessage = new TextBlock

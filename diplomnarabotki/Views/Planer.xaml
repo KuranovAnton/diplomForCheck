@@ -7,11 +7,14 @@
       xmlns:viewModels="clr-namespace:diplomnarabotki.ViewModels.NoteViewModels"
       xmlns:sys="clr-namespace:System;assembly=mscorlib"
       mc:Ignorable="d" 
-      d:DesignHeight="700" d:DesignWidth="1000"
+      d:DesignHeight="1080" d:DesignWidth="1920"
       Title="Планер путешествий"
-      Background="#F5F5F5"
       Loaded="Page_Loaded"
       AllowDrop="True">
+
+    <Page.Background>
+        <ImageBrush ImageSource="/Views/Images/planerBackground.png" Stretch="UniformToFill"/>
+    </Page.Background>
 
     <Page.Resources>
         <BooleanToVisibilityConverter x:Key="BoolToVisibility"/>
@@ -63,61 +66,55 @@
 
         <Grid.ColumnDefinitions>
             <ColumnDefinition Width="*"/>
-            <ColumnDefinition Width="2*"/>
+            <ColumnDefinition Width="0.8*"/>
+            <ColumnDefinition Width="200"/>
         </Grid.ColumnDefinitions>
 
-        <!-- Верхняя панель управления -->
-        <Border Grid.Row="0" Grid.ColumnSpan="2" Background="White" CornerRadius="5" 
-                BorderBrush="#E0E0E0" BorderThickness="1" Margin="0,0,0,10" Padding="10">
-            <StackPanel Orientation="Horizontal" HorizontalAlignment="Left">
-                <Button x:Name="BtnNewTravel" Content="➕ Новое путешествие" 
-                        Click="BtnNewTravel_Click" Width="160" Height="35" Margin="5"
-                        Background="#4CAF50" Foreground="White" BorderThickness="0"
-                        Cursor="Hand" FontWeight="Bold"/>
+     
+        <Grid Grid.Row="1" Grid.Column="2">
+            <Button Width="92" Click="BtnOpenMap" Cursor="Hand" Margin="100,37,8,984" Padding="0" BorderBrush="Transparent" ToolTip="Карта маршрута">
+                <Image Source="/Views/Images/goMapPageButton.png"/>
+            </Button>
+            <Button Width="92" Click="MemoriesButton" Cursor="Hand" Margin="80,88,28,934" Padding="0" BorderBrush="Transparent" ToolTip="Воспоминания">
+                <Image Source="/Views/Images/goMemoriesPageButton.png"/>
+            </Button>
+        </Grid>
 
-                <Button x:Name="BtnOpenMap" Content="🗺️ Карта маршрута" 
-                        Click="BtnOpenMap_Click" Width="140" Height="35" Margin="5"
-                        Background="#9C27B0" Foreground="White" BorderThickness="0"
-                        Cursor="Hand" FontWeight="Bold"/>
-
-                <Button x:Name="MemoriesButton" Content="📸 Воспоминания" 
-                        Margin="5" Padding="10,5" Click="MemoriesButton_Click"
-                        Background="#9b59b6" Foreground="White"
-                        BorderBrush="#9b59b6" Cursor="Hand" FontWeight="Bold"/>
-
-                <Separator Width="20" Visibility="Visible"/>
-
-                <TextBlock Text="Текущее путешествие:" VerticalAlignment="Center" 
-                           Margin="10,0,5,0" FontSize="12" Foreground="#666"/>
-                <ComboBox x:Name="CmbTravels" Width="200" Height="35" Margin="5"
-                          SelectionChanged="CmbTravels_SelectionChanged"
-                          FontSize="12" Background="White"/>
-            </StackPanel>
-        </Border>
-
-        <!-- Левая панель -->
-        <Border Grid.Row="1" Grid.Column="0" Background="White" CornerRadius="5" 
-                BorderBrush="#E0E0E0" BorderThickness="1" Margin="5" Padding="15">
+                <!-- Левая панель -->
+        <Border Grid.Row="1" Grid.Column="0" CornerRadius="5" 
+                BorderBrush="#E0E0E0" BorderThickness="1" Margin="5,5,5,5" Padding="15" HorizontalAlignment="Right">
             <ScrollViewer VerticalScrollBarVisibility="Auto">
                 <StackPanel>
-                    <TextBlock Text="✈️ Информация о путешествии" FontSize="18" 
+                    <StackPanel Orientation="Horizontal">
+                        <Button x:Name="BtnNewTravel" Content="➕ Новое путешествие" 
+Click="BtnNewTravel_Click" Width="160" Height="35" Margin="5"
+Background="#4CAF50" Foreground="White" BorderThickness="0"
+Cursor="Hand" FontWeight="Bold"/>
+                        <TextBlock Text="Текущее путешествие:" VerticalAlignment="Center" 
+  Margin="10,0,5,0" FontSize="12" Foreground="#666"/>
+                        <ComboBox x:Name="CmbTravels" Width="200" Height="35" Margin="5"
+ SelectionChanged="CmbTravels_SelectionChanged"
+ FontSize="12" Background="White"/>
+                    </StackPanel>
+                    <TextBlock Text="✈️ Информация о путешествии" FontSize="18" HorizontalAlignment="Right"
                                FontWeight="Bold" Margin="0,0,0,15" Foreground="#333"/>
 
-                    <TextBlock Text="Название:" FontWeight="Bold" Margin="0,5,0,0" 
+                    <TextBlock Text="Название:" FontWeight="Bold" Margin="0,5,0,0" HorizontalAlignment="Right"
                                FontSize="12" Foreground="#555"/>
                     <TextBox x:Name="TxtTravelName" TextWrapping="Wrap" Height="35" 
                              Margin="0,2,0,10" TextChanged="TravelInfo_Changed" 
-                             LostFocus="TxtTravelName_LostFocus"
+                             LostFocus="TxtTravelName_LostFocus" 
                              FontSize="12" BorderBrush="#DDD" BorderThickness="1"
-                             Padding="5" Background="#FAFAFA"/>
+                             Padding="5" Background="Transparent"/>
 
-                    <TextBlock Text="🗺️ Маршрут:" FontWeight="Bold" Margin="0,5,0,0" 
+                    <TextBlock Text="🗺️ Маршрут:" FontWeight="Bold" Margin="0,5,0,0" HorizontalAlignment="Right"
                                FontSize="12" Foreground="#555"/>
                     <TextBox x:Name="TxtRoute" TextWrapping="Wrap" Height="80" 
                              Margin="0,2,0,10" TextChanged="TravelInfo_Changed" 
                              LostFocus="TxtRoute_LostFocus"
+                             Background="Transparent"
                              AcceptsReturn="True" FontSize="12" BorderBrush="#DDD" 
-                             BorderThickness="1" Padding="5" Background="#FAFAFA"
+                             BorderThickness="1" Padding="5"
                              VerticalScrollBarVisibility="Auto"/>
 
                     <Separator Margin="0,10,0,10" Background="#E0E0E0" Height="1"/>
@@ -265,8 +262,8 @@
         </Border>
 
         <!-- Правая панель - Заметки -->
-        <Border Grid.Row="1" Grid.Column="1" Background="White" CornerRadius="5" 
-                BorderBrush="#E0E0E0" BorderThickness="1" Margin="5" Padding="15">
+        <Border Grid.Row="1" Grid.Column="1" CornerRadius="5" 
+                BorderBrush="#E0E0E0" BorderThickness="1" Margin="5,5,5,5" Padding="15">
             <Grid>
                 <Grid.RowDefinitions>
                     <RowDefinition Height="Auto"/>
@@ -311,7 +308,7 @@
                                 Width="90"
                                 Height="35"
                                 Margin="10,0,0,0"
-                                Background="#FF9800"
+                                Background="#FFEFCA92"
                                 Foreground="White"
                                 BorderThickness="0"
                                 Cursor="Hand"
@@ -338,11 +335,11 @@
                     <StackPanel Orientation="Horizontal" Margin="0,0,0,15">
                         <Button x:Name="BtnAddNote" Content="+ Добавить заметку" 
                                 Click="BtnAddNote_Click" Width="140" Height="35" 
-                                Margin="0,0,10,0" Background="#9C27B0" Foreground="White"
+                                Margin="0,0,10,0" Background="#FF9C9A9C" Foreground="White"
                                 BorderThickness="0" Cursor="Hand" FontWeight="Bold"/>
                         <Button x:Name="BtnDeleteNote" Content="✖ Удалить заметку" 
                                 Click="BtnDeleteNote_Click" Width="140" Height="35"
-                                Background="#F44336" Foreground="White" BorderThickness="0"
+                                Background="#FFD8817A" Foreground="White" BorderThickness="0"
                                 Cursor="Hand" FontWeight="Bold"/>
                     </StackPanel>
 

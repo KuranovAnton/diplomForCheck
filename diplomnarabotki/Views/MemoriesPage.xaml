@@ -4,10 +4,13 @@
       xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" 
       xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
       mc:Ignorable="d" 
-      d:DesignHeight="700" d:DesignWidth="1000"
+      d:DesignHeight="1080" d:DesignWidth="1920"
       Title="Воспоминания"
-      Background="White"
       Loaded="Page_Loaded">
+
+    <Page.Background>
+        <ImageBrush ImageSource="/Views/Images/memoriesPageBackground.png" Stretch="UniformToFill"/>
+    </Page.Background>
 
     <Page.Resources>
         <!-- Стиль для карточки воспоминания -->
@@ -15,14 +18,8 @@
             <Setter Property="Width" Value="240"/>
             <Setter Property="Height" Value="320"/>
             <Setter Property="Background" Value="White"/>
-            <Setter Property="BorderBrush" Value="#DDDDDD"/>
+            <Setter Property="BorderBrush" Value="White"/>
             <Setter Property="BorderThickness" Value="1"/>
-            <Setter Property="CornerRadius" Value="12"/>
-            <Setter Property="Effect">
-                <Setter.Value>
-                    <DropShadowEffect BlurRadius="10" ShadowDepth="3" Opacity="0.25"/>
-                </Setter.Value>
-            </Setter>
             <Style.Triggers>
                 <Trigger Property="IsMouseOver" Value="True">
                     <Setter Property="Effect">
@@ -30,7 +27,7 @@
                             <DropShadowEffect BlurRadius="15" ShadowDepth="5" Opacity="0.35"/>
                         </Setter.Value>
                     </Setter>
-                    <Setter Property="BorderBrush" Value="#667eea"/>
+                    <Setter Property="BorderBrush" Value="White"/>
                     <Setter Property="Cursor" Value="Hand"/>
                 </Trigger>
             </Style.Triggers>
@@ -41,111 +38,282 @@
             <Setter Property="VerticalScrollBarVisibility" Value="Auto"/>
             <Setter Property="HorizontalScrollBarVisibility" Value="Auto"/>
         </Style>
+
+        <!-- Стиль для RadioButton в виде квадратика с галочкой -->
+        <Style x:Key="FilterRadioStyle" TargetType="RadioButton">
+            <Setter Property="FontFamily" Value="Segoe UI"/>
+            <Setter Property="FontSize" Value="13"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Margin" Value="0,6,0,6"/>
+            <Setter Property="Padding" Value="8,6,8,6"/>
+            <Setter Property="Foreground" Value="#5C4B3A"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="RadioButton">
+                        <StackPanel Orientation="Horizontal">
+                            <!-- Квадратик -->
+                            <Border x:Name="RadioBorder" 
+                                    Width="18" 
+                                    Height="18" 
+                                    CornerRadius="3"
+                                    BorderBrush="{TemplateBinding Foreground}"
+                                    BorderThickness="1.5"
+                                    Background="Transparent"
+                                    Margin="0,0,8,0">
+                                <!-- Галочка -->
+                                <Path x:Name="CheckMark" 
+                                      Data="M 2,8 L 7,13 L 16,3" 
+                                      Stroke="{TemplateBinding Foreground}"
+                                      StrokeThickness="2"
+                                      StrokeEndLineCap="Round"
+                                      StrokeStartLineCap="Round"
+                                      Visibility="Collapsed"/>
+                            </Border>
+                            <!-- Контент (иконка + текст) -->
+                            <ContentPresenter x:Name="contentPresenter"
+                                              VerticalAlignment="Center"
+                                              RecognizesAccessKey="True"/>
+                        </StackPanel>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsChecked" Value="True">
+                                <Setter TargetName="CheckMark" Property="Visibility" Value="Visible"/>
+                                <Setter Property="FontWeight" Value="Bold"/>
+                            </Trigger>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="RadioBorder" Property="BorderBrush" Value="#8B7355"/>
+                                <Setter Property="Foreground" Value="#4A3727"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- Стиль для CheckBox в виде квадратика с галочкой (такой же как у RadioButton) -->
+        <Style x:Key="FilterCheckBoxStyle" TargetType="CheckBox">
+            <Setter Property="FontFamily" Value="Segoe UI"/>
+            <Setter Property="FontSize" Value="13"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Margin" Value="0,6,0,6"/>
+            <Setter Property="Padding" Value="8,6,8,6"/>
+            <Setter Property="Foreground" Value="#5C4B3A"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="CheckBox">
+                        <StackPanel Orientation="Horizontal">
+                            <!-- Квадратик -->
+                            <Border x:Name="CheckBoxBorder" 
+                                    Width="18" 
+                                    Height="18" 
+                                    CornerRadius="3"
+                                    BorderBrush="{TemplateBinding Foreground}"
+                                    BorderThickness="1.5"
+                                    Background="Transparent"
+                                    Margin="0,0,8,0">
+                                <!-- Галочка -->
+                                <Path x:Name="CheckMark" 
+                                      Data="M 2,8 L 7,13 L 16,3" 
+                                      Stroke="{TemplateBinding Foreground}"
+                                      StrokeThickness="2"
+                                      StrokeEndLineCap="Round"
+                                      StrokeStartLineCap="Round"
+                                      Visibility="Collapsed"/>
+                            </Border>
+                            <!-- Контент (иконка + текст) -->
+                            <ContentPresenter x:Name="contentPresenter"
+                                              VerticalAlignment="Center"
+                                              RecognizesAccessKey="True"/>
+                        </StackPanel>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsChecked" Value="True">
+                                <Setter TargetName="CheckMark" Property="Visibility" Value="Visible"/>
+                                <Setter Property="FontWeight" Value="Bold"/>
+                            </Trigger>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="CheckBoxBorder" Property="BorderBrush" Value="#8B7355"/>
+                                <Setter Property="Foreground" Value="#4A3727"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
     </Page.Resources>
 
     <Grid>
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="300"/>
+            <ColumnDefinition Width="*"/>
+            <ColumnDefinition Width="200"/>
+        </Grid.ColumnDefinitions>
         <Grid.RowDefinitions>
-            <RowDefinition Height="Auto"/>
-            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="20"/>
+            <RowDefinition Height="0.6*"/>
             <RowDefinition Height="*"/>
         </Grid.RowDefinitions>
 
         <!-- Панель инструментов -->
-        <Border Grid.Row="0" Background="#FFF5F5F5" BorderBrush="#FFE0E0E0" BorderThickness="0,0,0,1">
-            <StackPanel Orientation="Horizontal" Margin="10" HorizontalAlignment="Left">
+        <Border Grid.Column="0" Grid.Row="2" Padding="30,0,0,0">
+            <StackPanel Orientation="Vertical" Margin="10" HorizontalAlignment="Left">
                 <Button x:Name="AutoArrangeButton" 
-                        Content="🔄 Авто-раскладка" 
-                        Margin="5"
-                        Padding="10,5"
-                        Click="AutoArrangeButton_Click"
-                        Background="#667eea"
-                        Foreground="White"
-                        BorderBrush="#667eea"
-                        Cursor="Hand"
-                        FontWeight="Bold"/>
+            Content="🔄 Авто-раскладка" 
+            Margin="30,0,0,0"
+            Padding="10,5"
+            Click="AutoArrangeButton_Click"
+            Background="#8B7D6B"
+            Foreground="White"
+            BorderBrush="#8B7D6B"
+            Cursor="Hand"
+            FontWeight="Bold"/>
+
                 <Button x:Name="ResetPositionsButton" 
-                        Content="🗑️ Сбросить позиции" 
-                        Margin="5"
-                        Padding="10,5"
-                        Click="ResetPositionsButton_Click"
-                        Background="#e53e3e"
-                        Foreground="White"
-                        BorderBrush="#e53e3e"
-                        Cursor="Hand"
-                        FontWeight="Bold"/>
+            Content="🗑️ Сбросить позиции" 
+            Margin="-30,10,0,0"
+            Padding="10,5"
+            Click="ResetPositionsButton_Click"
+            Background="#A0705A"
+            Foreground="White"
+            BorderBrush="#A0705A"
+            Cursor="Hand"
+            FontWeight="Bold"/>
+
                 <Button x:Name="ExportImageButton" 
-                        Content="📸 Экспорт" 
-                        Margin="5"
-                        Padding="10,5"
-                        Click="ExportImageButton_Click"
-                        Background="#48bb78"
-                        Foreground="White"
-                        BorderBrush="#48bb78"
-                        Cursor="Hand"
-                        FontWeight="Bold"
-                        ToolTip="Сохранить доску как изображение"/>
+            Content="📸 Экспорт" 
+            Margin="30,10,0,0"
+            Padding="10,5"
+            Click="ExportImageButton_Click"
+            Background="#6B8B6B"
+            Foreground="White"
+            BorderBrush="#6B8B6B"
+            Cursor="Hand"
+            FontWeight="Bold"
+            ToolTip="Сохранить доску как изображение"/>
+
                 <Button x:Name="UndoButton" 
-                        Content="↩️ Откатить" 
-                        Margin="5"
-                        Padding="10,5"
-                        Click="UndoButton_Click"
-                        Background="#f39c12"
-                        Foreground="White"
-                        BorderBrush="#f39c12"
-                        Cursor="Hand"
-                        FontWeight="Bold"
-                        IsEnabled="False"
-                        ToolTip="Вернуть последнее удаление"/>
+            Margin="-30,10,0,0"
+            Content="↩️ Откатить"
+            Padding="10,5"
+            Click="UndoButton_Click"
+            Background="#B8967A"
+            Foreground="White"
+            BorderBrush="#B8967A"
+            Cursor="Hand"
+            FontWeight="Bold"
+            IsEnabled="False"
+            ToolTip="Вернуть последнее удаление"/>
+
                 <Button x:Name="ArrangeByMapButton" 
-                        Content="🗺️ Как на карте" 
-                        Margin="5"
-                        Padding="10,5"
-                        Click="ArrangeByMapButton_Click"
-                        Background="#3498db"
-                        Foreground="White"
-                        BorderBrush="#3498db"
-                        Cursor="Hand"
-                        FontWeight="Bold"
-                        ToolTip="Расположить карточки согласно координатам точек на карте"/>
+            Content="🗺️ Как на карте" 
+            Margin="30,10,0,0"
+            Padding="10,5"
+            Click="ArrangeByMapButton_Click"
+            Background="#7B8B9E"
+            Foreground="White"
+            BorderBrush="#7B8B9E"
+            Cursor="Hand"
+            FontWeight="Bold"
+            ToolTip="Расположить карточки согласно координатам точек на карте"/>
+
                 <Button x:Name="ResetZoomButton" 
-                        Content="🔍 Сбросить масштаб" 
-                        Margin="5"
-                        Padding="10,5"
-                        Click="ResetZoomButton_Click"
-                        Background="#e67e22"
-                        Foreground="White"
-                        BorderBrush="#e67e22"
-                        Cursor="Hand"
-                        FontWeight="Bold"
-                        ToolTip="Сбросить масштаб"/>
-                <TextBlock Text="|" Margin="15,0" VerticalAlignment="Center" Foreground="#FFCCCCCC"/>
-                <TextBlock Text="💡 Перетаскивайте карточки мышью, двигайте доску зажатой ПРАВОЙ кнопкой, масштабируйте Ctrl+колёсико" 
-                           Margin="10,0"
-                           VerticalAlignment="Center"
+            Content="🔍 Сбросить масштаб" 
+            Margin="-30,10,0,0"
+            Padding="10,5"
+            Click="ResetZoomButton_Click"
+            Background="#9B8B6B"
+            Foreground="White"
+            BorderBrush="#9B8B6B"
+            Cursor="Hand"
+            FontWeight="Bold"
+            ToolTip="Сбросить масштаб"/>
+            </StackPanel>
+        </Border>
+
+        <TextBlock Grid.Row="0" Grid.Column="1" Text="💡 Перетаскивайте карточки мышью, двигайте доску зажатой ПРАВОЙ кнопкой, масштабируйте Ctrl+колёсико" 
+            Margin="10,0"
+            VerticalAlignment="Center"
+            FontSize="11"
+            Foreground="#FF888888"
+            FontStyle="Italic"/>
+
+        <!-- Панель фильтров - стилизована под листик бумаги -->
+        <Border Grid.Column="0" Grid.Row="1" 
+                Background="#FFFDFCF9" 
+                BorderBrush="#E0D0B8" 
+                BorderThickness="1,1,1,1"
+                CornerRadius="0,8,8,0"
+                Height="300"
+                Margin="30">
+
+            <StackPanel Margin="8,12,8,12">
+                <!-- Заголовок как на листе бумаги -->
+                <TextBlock Text="📋 ФИЛЬТРЫ" 
+                           VerticalAlignment="Center" 
+                           FontWeight="Bold" 
+                           Margin="5,0,0,12"
+                           FontSize="15"
+                           Foreground="#8B7355"/>
+
+                <!-- Фильтры в виде RadioButton с квадратиками-галочками -->
+                <RadioButton x:Name="FilterAll" 
+                             Content="Все" 
+                             Style="{StaticResource FilterRadioStyle}"
+                             IsChecked="True" 
+                             Checked="Filter_Changed"/>
+
+                <RadioButton x:Name="FilterVisited" 
+                             Content="Посещено ✗" 
+                             Style="{StaticResource FilterRadioStyle}"
+                             Checked="Filter_Changed"/>
+
+                <RadioButton x:Name="FilterPlanned" 
+                             Content="Запланировано 📅" 
+                             Style="{StaticResource FilterRadioStyle}"
+                             Checked="Filter_Changed"/>
+
+                <RadioButton x:Name="FilterWish" 
+                             Content="Хочу посетить ⭐" 
+                             Style="{StaticResource FilterRadioStyle}"
+                             Checked="Filter_Changed"/>
+
+                <!-- Декоративная линия отрыва -->
+                <Border Height="1" 
+                        Background="#E8D5B7" 
+                        Margin="5,15,5,15"
+                        BorderBrush="#D4C0A8"
+                        BorderThickness="0"
+                        CornerRadius="0.5"/>
+
+                <!-- Блок связей -->
+                <TextBlock Text="🔗 СВЯЗИ" 
+                           VerticalAlignment="Center" 
+                           FontWeight="SemiBold" 
+                           Margin="5,0,0,8"
                            FontSize="11"
-                           Foreground="#FF888888"
+                           Foreground="#8B7355"/>
+
+                <!-- CheckBox для связей в том же стиле -->
+                <CheckBox x:Name="ShowConnectionsCheckbox" 
+                          IsChecked="True" 
+                          Style="{StaticResource FilterCheckBoxStyle}"
+                          Checked="ShowConnections_Changed" 
+                          Unchecked="ShowConnections_Changed">
+                    <TextBlock Text="Показывать связи" Margin="5,0,0,0"/>
+                </CheckBox>
+
+                <!-- Маленький штамп внизу -->
+                <TextBlock Text="✧  воспоминания  ✧"
+                           FontSize="9"
+                           Foreground="#D4C0A8"
+                           HorizontalAlignment="Center"
+                           Margin="0,15,0,0"
                            FontStyle="Italic"/>
             </StackPanel>
         </Border>
 
-        <!-- Панель фильтров -->
-        <Border Grid.Row="1" Background="White" BorderBrush="#FFE0E0E0" BorderThickness="0,1,0,1">
-            <StackPanel Orientation="Horizontal" Margin="10">
-                <TextBlock Text="📋 Фильтр: " VerticalAlignment="Center" FontWeight="Bold" Margin="0,0,10,0"/>
-                <RadioButton x:Name="FilterAll" Content="Все" IsChecked="True" Margin="5" VerticalAlignment="Center" Checked="Filter_Changed"/>
-                <RadioButton x:Name="FilterVisited" Content="✅ Посещено" Margin="5" VerticalAlignment="Center" Checked="Filter_Changed"/>
-                <RadioButton x:Name="FilterPlanned" Content="📅 Запланировано" Margin="5" VerticalAlignment="Center" Checked="Filter_Changed"/>
-                <RadioButton x:Name="FilterWish" Content="⭐ Хочу посетить" Margin="5" VerticalAlignment="Center" Checked="Filter_Changed"/>
-
-                <Separator Margin="15,0" Width="1" Background="#FFCCCCCC"/>
-
-                <TextBlock Text="🔗 Показывать связи:" VerticalAlignment="Center" Margin="10,0,5,0"/>
-                <CheckBox x:Name="ShowConnectionsCheckbox" IsChecked="True" Margin="0,0,10,0" VerticalAlignment="Center" Checked="ShowConnections_Changed" Unchecked="ShowConnections_Changed"/>
-            </StackPanel>
-        </Border>
-
         <!-- Основной Canvas для доски -->
-        <ScrollViewer Grid.Row="2" x:Name="MainScrollViewer" 
+        <ScrollViewer Grid.Column="1" x:Name="MainScrollViewer" 
                       PreviewMouseWheel="MainScrollViewer_PreviewMouseWheel"
                       MouseRightButtonDown="MainScrollViewer_MouseRightButtonDown"
                       MouseRightButtonUp="MainScrollViewer_MouseRightButtonUp"
@@ -153,14 +321,19 @@
                       MouseLeave="MainScrollViewer_MouseLeave"
                       Cursor="Hand">
             <Canvas x:Name="MemoriesCanvas" 
-                    Background="#FFFAFAFA"
                     MinWidth="1200" 
-                    MinHeight="800"
+                    MinHeight="1080"
                     SizeChanged="MemoriesCanvas_SizeChanged">
 
                 <!-- Линии и карточки будут добавляться динамически -->
 
             </Canvas>
         </ScrollViewer>
+        <Grid Grid.Column="2" Grid.Row="1">
+            <Button Width="92" Click="BtnBack_Click"  Margin="80,141,30,220" Padding="0" BorderBrush="Transparent" ToolTip="Вернуться к планеру">
+                <Image Source="/Views/Images/backMemoriesPageButton.png"/>
+            </Button>
+        </Grid>
+
     </Grid>
 </Page>
